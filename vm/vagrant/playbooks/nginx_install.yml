@@ -1,0 +1,29 @@
+# playbooks/nginx_install.yml
+---
+- name: Install Nginx
+  hosts: backend
+  become: true
+
+  tasks:
+    - name: Install nginx package
+      apt:
+        name: nginx
+        state: present
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: Enable and start nginx
+      service:
+        name: nginx
+        state: started
+        enabled: true
+
+    - name: Show nginx version
+      command: nginx -v
+      register: nginx_v
+      changed_when: false
+      failed_when: false
+
+    - name: Print nginx version
+      debug:
+        var: nginx_v.stderr
