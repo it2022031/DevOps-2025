@@ -1,0 +1,22 @@
+---
+# 0) Common fixes / prerequisites (all hosts)
+- name: Common prep on all VMs
+  hosts: all
+  become: true
+  tasks:
+    - name: Ensure remote tmp dir exists (avoid become_user tmp permission issues)
+      file:
+        path: "/tmp/.ansible-{{ lookup('env','USER') | default('ansible') }}"
+        state: directory
+        mode: "1777"
+
+# 1) Database
+- import_playbook: postgres.yml
+
+# 2) Supporting services on backend
+- import_playbook: minio.yml
+- import_playbook: mailhog.yml
+
+# 3) Backend app prerequisites + code
+- import_playbook: java21.yml
+- import_playbook: clone_ds2025.yml
