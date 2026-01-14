@@ -12,3 +12,4 @@
 
 # Ansible
 *.retry
+.idea/
