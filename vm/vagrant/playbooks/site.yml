@@ -4,7 +4,7 @@
   hosts: all
   become: true
   tasks:
-    - name: Ensure remote tmp dir exists (avoid become_user tmp permission issues)
+    - name: Ensure remote tmp dir exists
       file:
         path: "/tmp/.ansible-{{ lookup('env','USER') | default('ansible') }}"
         state: directory
@@ -13,10 +13,23 @@
 # 1) Database
 - import_playbook: postgres.yml
 
-# 2) Supporting services on backend
+# 2) Supporting services on backend host (ή σε "services" host)
 - import_playbook: minio.yml
 - import_playbook: mailhog.yml
 
-# 3) Backend app prerequisites + code
+# 3) Backend prerequisites + code
 - import_playbook: java21.yml
+- import_playbook: maven.yml
 - import_playbook: clone_ds2025.yml
+
+# 4) Backend runtime
+- import_playbook: backend_env.yml
+
+- import_playbook: build_backend.yml
+
+# 5) Healthchecks (προαιρετικό)
+- import_playbook: healthcheck.yml
+
+- import_playbook: backend_service.yml
+
+

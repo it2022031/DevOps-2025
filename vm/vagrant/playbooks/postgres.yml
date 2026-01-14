@@ -1,3 +1,4 @@
+# playbooks/postgres.yml
 ---
 - name: Install and configure PostgreSQL on db server
   hosts: db
@@ -8,7 +9,7 @@
     db_name: demo_db
     db_user: demo_user
     db_pass: demo_pass
-    allowed_cidr: "192.168.56.0/24"
+    allowed_cidr: "10.10.10.0/24"
 
   tasks:
     - name: Install PostgreSQL and dependencies
@@ -54,7 +55,6 @@
         name: "{{ db_name }}"
         owner: "{{ db_user }}"
 
-    # --- Apply config changes immediately (DevOps-friendly) ---
     - name: Apply pending handler actions now
       meta: flush_handlers
 
@@ -67,8 +67,6 @@
 
     - name: Verify PostgreSQL is listening on TCP 5432
       shell: "ss -lntp | grep ':5432' || true"
-      args:
-        executable: /bin/bash
       register: pg_listen_check
       changed_when: false
 

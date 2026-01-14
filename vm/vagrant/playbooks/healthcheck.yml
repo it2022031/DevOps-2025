@@ -1,3 +1,4 @@
+# playbooks/healthcheck.yml
 ---
 - name: Healthcheck DB (PostgreSQL)
   hosts: db
@@ -19,9 +20,13 @@
       debug:
         var: pg_listen.stdout_lines
 
+
 - name: Healthcheck connectivity from backend to DB
   hosts: backend
   become: true
+  vars:
+    db_host: "{{ hostvars['dbvm'].ip }}"
+    db_port: 5432
   tasks:
     - name: Ensure netcat exists
       apt:
@@ -30,13 +35,18 @@
         update_cache: yes
         cache_valid_time: 3600
 
-    - name: Check TCP connectivity to DB:5432
-      shell: "nc -vz 192.168.56.102 5432"
+    - name: Check TCP connectivity to DB
+      shell: "nc -vz {{ db_host }} {{ db_port }}"
       register: nc_db
       changed_when: false
-      retries: 5
+      retries: 10
       delay: 2
       until: nc_db.rc == 0
+
+    - name: Show DB connectivity result
+      debug:
+        var: nc_db.stderr_lines
+
 
 - name: Healthcheck MinIO and MailHog ports on backend
   hosts: backend
@@ -48,5 +58,6 @@
       changed_when: false
       failed_when: ports.stdout | length == 0
 
-    - debug:
+    - name: Show listening ports
+      debug:
         var: ports.stdout_lines

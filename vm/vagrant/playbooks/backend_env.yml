@@ -1,3 +1,4 @@
+# playbooks/backend_env.yml
 ---
 - name: Configure backend environment variables
   hosts: backend
@@ -7,7 +8,7 @@
     env_dir: /opt/DS-2025/backend
     env_file: /opt/DS-2025/backend/app.env
 
-    db_host: 192.168.56.102
+    db_host: "{{ hostvars['dbvm'].ip }}"
     db_port: 5432
     db_name: demo_db
     db_user: demo_user
@@ -15,12 +16,12 @@
 
     spring_profile: prod
 
-    # MailHog (SMTP)
-    mail_host: 192.168.56.101
+    # MailHog runs on backend VM (same host) -> use localhost
+    mail_host: 127.0.0.1
     mail_port: 1025
 
-    # MinIO
-    minio_endpoint: http://192.168.56.101:9000
+    # MinIO runs on backend VM (same host) -> use localhost
+    minio_endpoint: "http://127.0.0.1:9000"
     minio_access_key: minioadmin
     minio_secret_key: minioadmin123
 
