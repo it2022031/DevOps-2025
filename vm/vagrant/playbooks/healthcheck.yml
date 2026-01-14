@@ -1,0 +1,52 @@
+---
+- name: Healthcheck DB (PostgreSQL)
+  hosts: db
+  become: true
+  tasks:
+    - name: Postgres service active
+      command: systemctl is-active postgresql
+      register: pg_active
+      changed_when: false
+      failed_when: pg_active.stdout.strip() != "active"
+
+    - name: Postgres listening on 5432
+      shell: "ss -lntp | grep ':5432' || true"
+      register: pg_listen
+      changed_when: false
+      failed_when: pg_listen.stdout | length == 0
+
+    - name: Show postgres listen
+      debug:
+        var: pg_listen.stdout_lines
+
+- name: Healthcheck connectivity from backend to DB
+  hosts: backend
+  become: true
+  tasks:
+    - name: Ensure netcat exists
+      apt:
+        name: netcat-openbsd
+        state: present
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: Check TCP connectivity to DB:5432
+      shell: "nc -vz 192.168.56.102 5432"
+      register: nc_db
+      changed_when: false
+      retries: 5
+      delay: 2
+      until: nc_db.rc == 0
+
+- name: Healthcheck MinIO and MailHog ports on backend
+  hosts: backend
+  become: true
+  tasks:
+    - name: Check ports 9000/9001/1025/8025 are listening
+      shell: "ss -lntp | egrep ':9000|:9001|:1025|:8025' || true"
+      register: ports
+      changed_when: false
+      failed_when: ports.stdout | length == 0
+
+    - debug:
+        var: ports.stdout_lines

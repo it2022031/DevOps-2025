@@ -1,0 +1,44 @@
+---
+- name: Build Spring Boot backend JAR
+  hosts: backend
+  become: true
+
+  vars:
+    project_dir: /opt/DS-2025/backend/demo
+    jar_dest: /opt/DS-2025/backend/app.jar
+    build_user: vagrant
+
+  tasks:
+    - name: Build backend (skip tests)
+      command: mvn -DskipTests package
+      args:
+        chdir: "{{ project_dir }}"
+      become_user: "{{ build_user }}"
+
+    - name: Find built jar (exclude sources/javadoc/original)
+      shell: |
+        ls -1 {{ project_dir }}/target/*.jar \
+          | grep -vE '(-sources|-javadoc|\.original)\.jar$' \
+          | head -n 1
+      args:
+        executable: /bin/bash
+      register: built_jar
+      changed_when: false
+
+    - name: Fail if no jar found
+      fail:
+        msg: "Build finished but no suitable JAR found in {{ project_dir }}/target"
+      when: built_jar.stdout | length == 0
+
+    - name: Copy jar to stable path (app.jar)
+      copy:
+        src: "{{ built_jar.stdout }}"
+        dest: "{{ jar_dest }}"
+        remote_src: true
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Show selected jar
+      debug:
+        msg: "Built jar: {{ built_jar.stdout }} -> {{ jar_dest }}"

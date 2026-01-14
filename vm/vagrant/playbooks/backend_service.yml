@@ -1,0 +1,83 @@
+---
+- name: Create and run backend systemd service
+  hosts: backend
+  become: true
+
+  vars:
+    app_name: ds2025-backend
+    workdir: /opt/DS-2025/backend
+    jar_path: /opt/DS-2025/backend/app.jar
+    env_file: /opt/DS-2025/backend/app.env
+    run_user: vagrant
+
+  tasks:
+    - name: Create systemd unit file
+      copy:
+        dest: "/etc/systemd/system/{{ app_name }}.service"
+        mode: "0644"
+        content: |
+          [Unit]
+          Description=DS-2025 Spring Boot Backend
+          Wants=network-online.target
+          After=network-online.target
+
+          [Service]
+          Type=simple
+          User={{ run_user }}
+          WorkingDirectory={{ workdir }}
+          EnvironmentFile={{ env_file }}
+          ExecStart=/usr/bin/java -jar {{ jar_path }}
+          Restart=always
+          RestartSec=3
+          SuccessExitStatus=143
+
+          [Install]
+          WantedBy=multi-user.target
+      notify: restart backend
+
+    - name: Reload systemd daemon
+      systemd:
+        daemon_reload: yes
+
+    - name: Enable and start backend service
+      systemd:
+        name: "{{ app_name }}"
+        enabled: yes
+        state: started
+
+    # Προαιρετικό αλλά πολύ χρήσιμο: έλεγχος ότι τρέχει
+    - name: Check backend service is active
+      command: systemctl is-active {{ app_name }}
+      register: svc_active
+      changed_when: false
+
+    - name: Show backend service status
+      debug:
+        var: svc_active.stdout
+    - name: Wait for backend port to be open
+      wait_for:
+        host: 127.0.0.1
+        port: 8080
+        state: started
+        timeout: 45
+
+    - name: Check backend HTTP response
+      uri:
+        url: "http://127.0.0.1:8080/"
+        method: GET
+        return_content: no
+        status_code: [200, 301, 302, 401, 403, 404]
+      register: http_check
+      retries: 6
+      delay: 3
+      until: http_check.status in [200, 301, 302, 401, 403, 404]
+
+    - name: Show backend HTTP status
+      debug:
+        msg: "Backend is reachable on http://127.0.0.1:8080 (HTTP {{ http_check.status }})"
+
+  handlers:
+    - name: restart backend
+      systemd:
+        name: "{{ app_name }}"
+        state: restarted

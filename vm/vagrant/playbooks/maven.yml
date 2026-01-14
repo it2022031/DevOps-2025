@@ -1,0 +1,20 @@
+---
+- name: Install Maven on backend VM
+  hosts: backend
+  become: true
+
+  tasks:
+    - name: Install Maven
+      apt:
+        name: maven
+        state: present
+        update_cache: yes
+
+    - name: Verify Maven installation
+      command: mvn -version
+      register: mvn_version
+      changed_when: false
+
+    - name: Show Maven version
+      debug:
+        var: mvn_version.stdout_lines
