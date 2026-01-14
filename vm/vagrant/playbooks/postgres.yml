@@ -1,0 +1,74 @@
+- name: Install and configure PostgreSQL on db server
+  hosts: db
+  become: true
+
+
+  vars:
+    ansible_become_method: sudo
+    ansible_remote_tmp: /tmp/.ansible-${USER}
+    pg_version: 14
+    db_name: demo_db
+    db_user: demo_user
+    db_pass: demo_pass
+    allowed_cidr: "192.168.56.0/24"
+
+  tasks:
+    - name: Install PostgreSQL and dependencies
+      apt:
+        name:
+          - postgresql
+          - postgresql-contrib
+          - python3-psycopg2
+        state: present
+        update_cache: yes
+
+    - name: Ensure PostgreSQL is running
+      service:
+        name: postgresql
+        state: started
+        enabled: yes
+
+    - name: Configure listen_addresses
+      lineinfile:
+        path: "/etc/postgresql/{{ pg_version }}/main/postgresql.conf"
+        regexp: "^#?listen_addresses"
+        line: "listen_addresses = '*'"
+      notify: restart postgres
+
+    - name: Allow network connections in pg_hba.conf
+      lineinfile:
+        path: "/etc/postgresql/{{ pg_version }}/main/pg_hba.conf"
+        line: "host    all     all     {{ allowed_cidr }}     md5"
+        insertafter: EOF
+      notify: restart postgres
+
+    - name: Create PostgreSQL user
+      become_user: postgres
+      postgresql_user:
+        name: "{{ db_user }}"
+        password: "{{ db_pass }}"
+        encrypted: yes
+
+    - name: Create PostgreSQL database
+      become_user: postgres
+      postgresql_db:
+        name: "{{ db_name }}"
+        owner: "{{ db_user }}"
+
+  handlers:
+    - name: Restart postgres if configs changed
+      meta: flush_handlers
+
+    - name: Wait for PostgreSQL to listen on 5432
+      wait_for:
+        host: "192.168.56.102"
+        port: 5432
+        state: started
+        timeout: 20
+
+    - name: Verify TCP listener on db
+      shell: "ss -lntp | grep ':5432' || (systemctl restart postgresql && ss -lntp | grep ':5432')"
+      args:
+        executable: /bin/bash
+      register: pg_listen_check
+      changed_when: false

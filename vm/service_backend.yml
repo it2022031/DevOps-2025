@@ -1,0 +1,56 @@
+---
+- name: Create and run backend systemd service
+  hosts: app
+  become: true
+
+  vars:
+    app_name: ds2025-backend
+    workdir: /opt/DS-2025/backend
+    jar_path: /opt/DS-2025/backend/app.jar
+    env_file: /opt/DS-2025/backend/app.env
+    run_user: vagrant
+
+  tasks:
+    - name: Create systemd unit file
+      copy:
+        dest: "/etc/systemd/system/{{ app_name }}.service"
+        mode: "0644"
+        content: |
+          [Unit]
+          Description=DS-2025 Spring Boot Backend
+          After=network.target
+
+          [Service]
+          Type=simple
+          User={{ run_user }}
+          WorkingDirectory={{ workdir }}
+          EnvironmentFile={{ env_file }}
+          ExecStart=/usr/bin/java -jar {{ jar_path }}
+          Restart=always
+          RestartSec=3
+          SuccessExitStatus=143
+
+          [Install]
+          WantedBy=multi-user.target
+      notify: Restart backend
+
+    - name: Reload systemd daemon
+      systemd:
+        daemon_reload: yes
+
+    - name: Enable backend service
+      systemd:
+        name: "{{ app_name }}"
+        enabled: yes
+
+    - name: Start backend service
+      systemd:
+        name: "{{ app_name }}"
+        state: started
+
+  handlers:
+    - name: Restart backend
+      systemd:
+        name: "{{ app_name }}"
+        state: restarted
+        daemon_reload: yes

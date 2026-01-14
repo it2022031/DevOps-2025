@@ -1,0 +1,56 @@
+---
+- name: Configure backend environment variables
+  hosts: app
+  become: true
+
+  vars:
+    env_file: /opt/DS-2025/backend/app.env
+
+    db_host: 192.168.56.102
+    db_port: 5432
+    db_name: demo_db
+    db_user: demo_user
+    db_pass: demo_pass
+
+    spring_profile: prod
+
+  tasks:
+    - name: Ensure backend env directory exists
+      file:
+        path: /opt/DS-2025/backend
+        state: directory
+        owner: vagrant
+        group: vagrant
+        mode: "0755"
+
+    - name: Set SPRING_PROFILES_ACTIVE
+      lineinfile:
+        path: "{{ env_file }}"
+        create: yes
+        regexp: "^SPRING_PROFILES_ACTIVE="
+        line: "SPRING_PROFILES_ACTIVE={{ spring_profile }}"
+
+    - name: Set SPRING_DATASOURCE_URL
+      lineinfile:
+        path: "{{ env_file }}"
+        create: yes
+        regexp: "^SPRING_DATASOURCE_URL="
+        line: "SPRING_DATASOURCE_URL=jdbc:postgresql://{{ db_host }}:{{ db_port }}/{{ db_name }}"
+
+    - name: Set SPRING_DATASOURCE_USERNAME
+      lineinfile:
+        path: "{{ env_file }}"
+        create: yes
+        regexp: "^SPRING_DATASOURCE_USERNAME="
+        line: "SPRING_DATASOURCE_USERNAME={{ db_user }}"
+
+    - name: Set SPRING_DATASOURCE_PASSWORD
+      lineinfile:
+        path: "{{ env_file }}"
+        create: yes
+        regexp: "^SPRING_DATASOURCE_PASSWORD="
+        line: "SPRING_DATASOURCE_PASSWORD={{ db_pass }}"
+
+    - name: Debug env file path
+      debug:
+        msg: "Backend env file written at {{ env_file }}"

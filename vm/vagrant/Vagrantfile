@@ -1,38 +1,38 @@
 Vagrant.configure("2") do |config|
   config.vm.box = "generic/ubuntu2204"
+  config.vm.boot_timeout = 600
 
   config.vm.synced_folder ".", "/vagrant", type: "virtualbox"
 
-  # -------- appserver --------
-  config.vm.define "appserver" do |h|
-    h.vm.hostname = "appserver"
+  def vb_defaults(vb)
+    vb.memory = "2048"
+    vb.cpus = 2
+  end
+
+  # -------- backend --------
+  config.vm.define "backend" do |h|
+    h.vm.hostname = "backend"
     h.vm.network "private_network", ip: "192.168.56.101"
-
     h.vm.provider "virtualbox" do |vb|
-      vb.memory = "2048"
-      vb.cpus = 2
+      vb_defaults(vb)
     end
   end
 
-  # -------- dbserver --------
-  config.vm.define "dbserver" do |h|
-    h.vm.hostname = "dbserver"
+  # -------- db --------
+  config.vm.define "db" do |h|
+    h.vm.hostname = "db"
     h.vm.network "private_network", ip: "192.168.56.102"
-
     h.vm.provider "virtualbox" do |vb|
-      vb.memory = "2048"
-      vb.cpus = 2
+      vb_defaults(vb)
     end
   end
 
-  # -------- frontserver --------
-  config.vm.define "frontserver" do |h|
-    h.vm.hostname = "frontserver"
+  # -------- front --------
+  config.vm.define "front" do |h|
+    h.vm.hostname = "front"
     h.vm.network "private_network", ip: "192.168.56.103"
-
     h.vm.provider "virtualbox" do |vb|
-      vb.memory = "2048"
-      vb.cpus = 2
+      vb_defaults(vb)
     end
   end
 end

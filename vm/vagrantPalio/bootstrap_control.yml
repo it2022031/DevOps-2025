@@ -1,0 +1,44 @@
+---
+- name: Bootstrap control VM (install ansible + upload infra)
+  hosts: control
+  become: true
+
+  vars:
+    remote_infra_dir: /home/vagrant/infra
+
+  tasks:
+    - name: Install prerequisites on control
+      apt:
+        update_cache: yes
+        name:
+          - ansible
+          - git
+          - rsync
+        state: present
+
+    - name: Create infra directory on control
+      file:
+        path: "{{ remote_infra_dir }}"
+        state: directory
+        owner: vagrant
+        group: vagrant
+        mode: "0755"
+
+- name: Upload infra files and run from control
+  hosts: control
+  become: false
+
+  vars:
+    remote_infra_dir: /home/vagrant/infra
+
+  tasks:
+    - name: Upload infra/ to control (needs rsync)
+      synchronize:
+        src: ./infra/
+        dest: "{{ remote_infra_dir }}/"
+        delete: true
+
+    - name: Run site.yml from inside control
+      command: ansible-playbook -i hosts.ini site.yml
+      args:
+        chdir: "{{ remote_infra_dir }}"

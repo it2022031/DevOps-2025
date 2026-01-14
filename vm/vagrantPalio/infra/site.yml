@@ -1,0 +1,14 @@
+---
+- name: Basic connectivity test
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Ping
+      ping:
+
+    - name: Show hostname
+      command: hostname
+      register: hn
+
+    - debug:
+        var: hn.stdout

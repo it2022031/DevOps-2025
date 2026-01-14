@@ -1,0 +1,33 @@
+---
+- name: Build Spring Boot backend
+  hosts: app
+  become: true
+
+  vars:
+    project_dir: /opt/DS-2025
+    backend_dir: /opt/DS-2025/backend
+    jar_output_dir: /opt/DS-2025/backend/target
+    jar_dest: /opt/DS-2025/backend/app.jar
+
+  tasks:
+    - name: Ensure backend directory exists
+      file:
+        path: "{{ backend_dir }}"
+        state: directory
+
+    - name: Build backend jar with Maven Wrapper
+      command: ./mvnw -DskipTests package
+      args:
+        chdir: "{{ backend_dir }}"
+
+    - name: Find built jar (first match)
+      shell: "ls -1 {{ jar_output_dir }}/*.jar | head -n 1"
+      register: built_jar
+      changed_when: false
+
+    - name: Copy built jar to stable path (app.jar)
+      copy:
+        src: "{{ built_jar.stdout }}"
+        dest: "{{ jar_dest }}"
+        remote_src: true
+        mode: "0755"

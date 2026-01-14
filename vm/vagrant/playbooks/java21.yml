@@ -1,0 +1,21 @@
+---
+- name: Install Java 21 on backend VM
+  hosts: backend
+  become: true
+
+  tasks:
+    - name: Install OpenJDK 21
+      apt:
+        name: openjdk-21-jdk
+        state: present
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: Verify Java installation
+      command: java -version
+      register: java_version
+      changed_when: false
+
+    - name: Show Java version
+      debug:
+        var: java_version.stderr_lines

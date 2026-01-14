@@ -1,0 +1,67 @@
+---
+- name: Install and configure MailHog on backend (native)
+  hosts: backend
+  become: true
+
+  vars:
+    mailhog_user: mailhog
+    mailhog_group: mailhog
+    mailhog_bin: /usr/local/bin/mailhog
+    smtp_port: 1025
+    ui_port: 8025
+
+  tasks:
+    - name: Create mailhog group
+      group:
+        name: "{{ mailhog_group }}"
+        system: true
+
+    - name: Create mailhog user
+      user:
+        name: "{{ mailhog_user }}"
+        group: "{{ mailhog_group }}"
+        system: true
+        shell: /usr/sbin/nologin
+        create_home: false
+
+    - name: Download MailHog binary
+      get_url:
+        url: "https://github.com/mailhog/MailHog/releases/download/v1.0.1/MailHog_linux_amd64"
+        dest: "{{ mailhog_bin }}"
+        mode: "0755"
+
+    - name: Create systemd unit for MailHog
+      copy:
+        dest: /etc/systemd/system/mailhog.service
+        mode: "0644"
+        content: |
+          [Unit]
+          Description=MailHog
+          After=network-online.target
+          Wants=network-online.target
+
+          [Service]
+          User={{ mailhog_user }}
+          Group={{ mailhog_group }}
+          ExecStart={{ mailhog_bin }} -smtp-bind-addr 0.0.0.0:{{ smtp_port }} -ui-bind-addr 0.0.0.0:{{ ui_port }}
+          Restart=always
+
+          [Install]
+          WantedBy=multi-user.target
+      notify: restart mailhog
+
+    - name: Reload systemd
+      systemd:
+        daemon_reload: true
+
+    - name: Enable and start MailHog
+      service:
+        name: mailhog
+        state: started
+        enabled: true
+
+  handlers:
+    - name: restart mailhog
+      service:
+        name: mailhog
+        state: restarted
