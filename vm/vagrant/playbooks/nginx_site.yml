@@ -1,0 +1,28 @@
+---
+- name: Write Nginx site config
+  hosts: backend
+  become: true
+
+  vars:
+    nginx_site: ds2025
+    backend_host: 127.0.0.1
+    backend_port: 8080
+    client_max_body_size: "50m"
+
+  tasks:
+    - name: Deploy nginx site config from template
+      template:
+        src: ../templates/nginx_ds2025.conf.j2
+        dest: /etc/nginx/sites-available/{{ nginx_site }}
+        mode: "0644"
+      notify: restart nginx
+
+    - name: Validate nginx configuration
+      command: nginx -t
+      changed_when: false
+
+  handlers:
+    - name: restart nginx
+      service:
+        name: nginx
+        state: restarted

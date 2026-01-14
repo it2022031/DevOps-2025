@@ -13,7 +13,7 @@
 # 1) Database
 - import_playbook: postgres.yml
 
-# 2) Supporting services on backend host (ή σε "services" host)
+# 2) Supporting services on backend host
 - import_playbook: minio.yml
 - import_playbook: mailhog.yml
 
@@ -22,14 +22,20 @@
 - import_playbook: maven.yml
 - import_playbook: clone_ds2025.yml
 
+
 # 4) Backend runtime
 - import_playbook: backend_env.yml
-
 - import_playbook: build_backend.yml
 
-# 5) Healthchecks (προαιρετικό)
 - import_playbook: healthcheck.yml
 
 - import_playbook: backend_service.yml
 
+# 5) Nginx (Install -> Template site -> Enable site -> Restart)
+- import_playbook: nginx_install.yml
+- import_playbook: nginx_site.yml
+- import_playbook: nginx_enable_site.yml
+- import_playbook: nginx_restart.yml
 
+# 6) Healthchecks (optional)
+- import_playbook: healthcheck.yml
