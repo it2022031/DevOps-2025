@@ -6,9 +6,10 @@
     db_name: demo_db
     db_user: demo_user
     db_pass: demo_pass
+    allowed_cidr: "192.168.56.0/24"
 
   tasks:
-    - name: Install PostgreSQL
+    - name: Install PostgreSQL + python driver
       apt:
         name:
           - postgresql
@@ -17,33 +18,47 @@
         state: present
         update_cache: yes
 
-    - name: Allow PostgreSQL to listen on all interfaces
+    - name: Find postgresql.conf path
+      shell: "ls /etc/postgresql/*/main/postgresql.conf | head -n 1"
+      register: pg_conf
+      changed_when: false
+
+    - name: Find pg_hba.conf path
+      shell: "ls /etc/postgresql/*/main/pg_hba.conf | head -n 1"
+      register: pg_hba
+      changed_when: false
+
+    - name: Set listen_addresses = '*'
       lineinfile:
-        path: /etc/postgresql/*/main/postgresql.conf
-        regexp: "^#?listen_addresses"
+        path: "{{ pg_conf.stdout }}"
+        regexp: "^#?listen_addresses\\s*=.*"
         line: "listen_addresses = '*'"
       notify: restart postgres
 
-    - name: Allow network access
+    - name: Allow connections from vagrant network
       lineinfile:
-        path: /etc/postgresql/*/main/pg_hba.conf
-        line: "host all all 192.168.56.0/24 md5"
+        path: "{{ pg_hba.stdout }}"
+        line: "host    all             all             {{ allowed_cidr }}          md5"
+        create: yes
       notify: restart postgres
 
-    - name: Create DB user
-      become_user: postgres
-      postgresql_user:
-        name: "{{ db_user }}"
-        password: "{{ db_pass }}"
+    - name: Create DB user (psql) - idempotent
+      shell: |
+        sudo -u postgres psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='{{ db_user }}'" | grep -q 1 \
+        || sudo -u postgres psql -c "CREATE ROLE {{ db_user }} LOGIN ENCRYPTED PASSWORD '{{ db_pass }}';"
+      args:
+        executable: /bin/bash
 
-    - name: Create DB
-      become_user: postgres
-      postgresql_db:
-        name: "{{ db_name }}"
-        owner: "{{ db_user }}"
+    - name: Create DB (psql) - idempotent
+      shell: |
+        sudo -u postgres psql -tAc "SELECT 1 FROM pg_database WHERE datname='{{ db_name }}'" | grep -q 1 \
+        || sudo -u postgres createdb -O {{ db_user }} {{ db_name }}
+      args:
+        executable: /bin/bash
+
 
   handlers:
-    - name: restart postgres
-      service:
-        name: postgresql
-        state: restarted
+      - name: restart postgres
+        service:
+          name: postgresql
+          state: restarted

@@ -1,0 +1,32 @@
+---
+- name: Clone/Update DS-2025 repository on appserver
+  hosts: app
+  become: true
+
+  vars:
+    repo_url: "https://github.com/it2022031/DS-2025.git"
+    project_dir: "/opt/DS-2025"
+    repo_version: "main-branch"   # άλλαξε σε "master" ή σε branch αν έχετε άλλο
+
+  tasks:
+    - name: Ensure git is installed
+      apt:
+        name: git
+        state: present
+        update_cache: yes
+
+    - name: Clone or update repository (idempotent)
+      git:
+        repo: "{{ repo_url }}"
+        dest: "{{ project_dir }}"
+        version: "{{ repo_version }}"
+        update: yes
+        force: no
+      register: git_result
+
+    - name: Show git result (changed means it pulled new commits)
+      debug:
+        msg: >
+          Repo changed={{ git_result.changed }}.
+          Before={{ git_result.before | default('N/A') }},
+          After={{ git_result.after | default('N/A') }}.
