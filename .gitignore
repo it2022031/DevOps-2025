@@ -1,0 +1,14 @@
+# Vagrant state (contains private keys!)
+**/.vagrant/
+
+# SSH keys (just in case)
+**/.ssh/
+**/id_rsa
+**/id_rsa.pub
+**/id_ed25519
+**/id_ed25519.pub
+**/*.pem
+**/*.key
+
+# Ansible
+*.retry
