@@ -2,16 +2,13 @@ Vagrant.configure("2") do |config|
   config.vm.box = "generic/ubuntu2204"
   config.vm.boot_timeout = 600
 
-  # Shared folder (project root -> /vagrant)
   config.vm.synced_folder ".", "/vagrant", type: "virtualbox"
 
-  # Common VM resources
   def vb_defaults(vb)
     vb.memory = 2048
     vb.cpus = 2
   end
 
-  # All VMs on the same VirtualBox internal network
   INTNET_NAME = "dsnet"
 
   # -------- backend --------
@@ -22,6 +19,10 @@ Vagrant.configure("2") do |config|
       ip: "10.10.10.11",
       netmask: "255.255.255.0",
       virtualbox__intnet: INTNET_NAME
+
+    # ✅ Port forward: Host (your PC) -> Guest (backend VM)
+    # Open in browser/Postman on host: http://127.0.0.1:8088
+    h.vm.network "forwarded_port", guest: 80, host: 8088, auto_correct: true
 
     h.vm.provider "virtualbox" do |vb|
       vb_defaults(vb)
