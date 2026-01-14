@@ -1,0 +1,38 @@
+Vagrant.configure("2") do |config|
+  config.vm.box = "generic/ubuntu2204"
+
+  config.vm.synced_folder ".", "/vagrant", type: "virtualbox"
+
+  # -------- appserver --------
+  config.vm.define "appserver" do |h|
+    h.vm.hostname = "appserver"
+    h.vm.network "private_network", ip: "192.168.56.101"
+
+    h.vm.provider "virtualbox" do |vb|
+      vb.memory = "2048"
+      vb.cpus = 2
+    end
+  end
+
+  # -------- dbserver --------
+  config.vm.define "dbserver" do |h|
+    h.vm.hostname = "dbserver"
+    h.vm.network "private_network", ip: "192.168.56.102"
+
+    h.vm.provider "virtualbox" do |vb|
+      vb.memory = "2048"
+      vb.cpus = 2
+    end
+  end
+
+  # -------- frontserver --------
+  config.vm.define "frontserver" do |h|
+    h.vm.hostname = "frontserver"
+    h.vm.network "private_network", ip: "192.168.56.103"
+
+    h.vm.provider "virtualbox" do |vb|
+      vb.memory = "2048"
+      vb.cpus = 2
+    end
+  end
+end

@@ -1,0 +1,49 @@
+- name: Install PostgreSQL on dbserver
+  hosts: db
+  become: true
+
+  vars:
+    db_name: demo_db
+    db_user: demo_user
+    db_pass: demo_pass
+
+  tasks:
+    - name: Install PostgreSQL
+      apt:
+        name:
+          - postgresql
+          - postgresql-contrib
+          - python3-psycopg2
+        state: present
+        update_cache: yes
+
+    - name: Allow PostgreSQL to listen on all interfaces
+      lineinfile:
+        path: /etc/postgresql/*/main/postgresql.conf
+        regexp: "^#?listen_addresses"
+        line: "listen_addresses = '*'"
+      notify: restart postgres
+
+    - name: Allow network access
+      lineinfile:
+        path: /etc/postgresql/*/main/pg_hba.conf
+        line: "host all all 192.168.56.0/24 md5"
+      notify: restart postgres
+
+    - name: Create DB user
+      become_user: postgres
+      postgresql_user:
+        name: "{{ db_user }}"
+        password: "{{ db_pass }}"
+
+    - name: Create DB
+      become_user: postgres
+      postgresql_db:
+        name: "{{ db_name }}"
+        owner: "{{ db_user }}"
+
+  handlers:
+    - name: restart postgres
+      service:
+        name: postgresql
+        state: restarted
