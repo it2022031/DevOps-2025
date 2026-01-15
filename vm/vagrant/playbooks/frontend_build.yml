@@ -1,5 +1,5 @@
 ---
-- name: Build VueJS frontend (npm install + npm run build)
+- name: Build frontend (npm install + npm run build)
   hosts: front
   become: true
 
@@ -8,33 +8,17 @@
     build_user: "vagrant"
 
   tasks:
-    - name: Ensure frontend directory exists
-      stat:
-        path: "{{ frontend_dir }}"
-      register: fe_dir
-
-    - name: Fail if frontend directory missing
-      fail:
-        msg: "frontend_dir={{ frontend_dir }} does not exist. Fix the path."
-      when: not fe_dir.stat.exists
-
-    - name: Install dependencies (npm ci if lock exists, else npm install)
+    - name: Install deps (npm ci/install)
       become_user: "{{ build_user }}"
       shell: |
         set -e
         export NVM_DIR="$HOME/.nvm"
         . "$NVM_DIR/nvm.sh"
         cd "{{ frontend_dir }}"
+        if [ -f package-lock.json ]; then npm ci; else npm install; fi
+      args: { executable: /bin/bash }
 
-        if [ -f package-lock.json ]; then
-          npm ci
-        else
-          npm install
-        fi
-      args:
-        executable: /bin/bash
-
-    - name: Build production assets (dist/)
+    - name: Build (dist/)
       become_user: "{{ build_user }}"
       shell: |
         set -e
@@ -42,19 +26,14 @@
         . "$NVM_DIR/nvm.sh"
         cd "{{ frontend_dir }}"
         npm run build
-      args:
-        executable: /bin/bash
+      args: { executable: /bin/bash }
 
-    - name: Verify dist/ exists
+    - name: Verify dist exists
       stat:
         path: "{{ frontend_dir }}/dist"
       register: dist_dir
 
-    - name: Fail if dist/ missing
+    - name: Fail if dist missing
       fail:
-        msg: "Build finished but dist/ was not created in {{ frontend_dir }}"
+        msg: "dist/ not created"
       when: not dist_dir.stat.exists
-
-    - name: Show dist/ top contents
-      command: ls -la "{{ frontend_dir }}/dist"
-      changed_when: false

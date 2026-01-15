@@ -1,5 +1,5 @@
 [Unit]
-Description=DS-2025 Vue Frontend (npm serve)
+Description=DS-2025 Frontend (static dist server)
 After=network-online.target
 Wants=network-online.target
 
@@ -8,8 +8,7 @@ Type=simple
 User={{ run_user }}
 WorkingDirectory={{ frontend_dir }}
 
-ExecStart=/bin/bash -lc 'export NVM_DIR="$HOME/.nvm"; . "$NVM_DIR/nvm.sh"; nvm use default; export HOST=0.0.0.0; export PORT={{ front_port }}; npm run serve -- --host 0.0.0.0'
-
+ExecStart=/bin/bash -lc 'export NVM_DIR="$HOME/.nvm"; . "$NVM_DIR/nvm.sh"; nvm use default; cd "{{ frontend_dir }}"; npx --yes serve -s dist -l {{ front_port }}'
 Restart=always
 RestartSec=3
 SuccessExitStatus=143
