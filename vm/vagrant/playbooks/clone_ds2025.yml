@@ -17,6 +17,21 @@
         update_cache: yes
         cache_valid_time: 3600
 
+    - name: Check if repo already exists
+      stat:
+        path: "{{ project_dir }}/.git"
+      register: repo_git
+
+    - name: Discard local changes if repo exists (reset + clean)
+      shell: |
+        set -e
+        cd "{{ project_dir }}"
+        git reset --hard
+        git clean -fd
+      args:
+        executable: /bin/bash
+      when: repo_git.stat.exists
+
     - name: Clone or update repository (idempotent)
       git:
         repo: "{{ repo_url }}"

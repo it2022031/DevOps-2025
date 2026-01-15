@@ -1,0 +1,62 @@
+---
+- name: Patch frontend hardcoded backend URLs
+  hosts: front
+  become: true
+
+  vars:
+    frontend_dir: "/opt/DS-2025/frontend/vue-argon-design-system-master"
+
+  tasks:
+    - name: Patch api paths in src (no localhost and no double /api)
+      shell: |
+        set -e
+        cd "{{ frontend_dir }}"
+
+        # 1) localhost:8080 -> /api
+        find src -type f \( -name "*.js" -o -name "*.vue" \) -print0 \
+          | xargs -0 sed -i "s|http://localhost:8080|/api|g"
+
+        # 2) fix any /api/api -> /api
+        find src -type f \( -name "*.js" -o -name "*.vue" \) -print0 \
+          | xargs -0 sed -i "s|/api/api/|/api/|g"
+        find src -type f \( -name "*.js" -o -name "*.vue" \) -print0 \
+          | xargs -0 sed -i "s|/api/api\"|/api\"|g"
+
+        # 3) fix api.js baseURL explicitly (if exists)
+        if [ -f src/api.js ]; then
+          sed -i 's|baseURL:[[:space:]]*\"/api/api\"|baseURL: \"/api\"|g' src/api.js
+        fi
+        # 4) Fix Register.vue paths when API_BASE already includes /api
+        if [ -f src/views/Register.vue ]; then
+          sed -i 's|`${API_BASE}/api/auth/register`|`${API_BASE}/auth/register`|g' src/views/Register.vue
+          sed -i 's|`${API_BASE}/api/auth/login`|`${API_BASE}/auth/login`|g' src/views/Register.vue
+          sed -i 's|`${API_BASE}/api/users/me`|`${API_BASE}/users/me`|g' src/views/Register.vue
+        fi
+      args:
+        executable: /bin/bash
+
+    - name: Fail if localhost backend URL still exists in src
+      shell: |
+        set -e
+        cd "{{ frontend_dir }}"
+        if grep -R --line-number "http://localhost:8080" src; then
+          echo "ERROR: Found hardcoded backend URL in src/"
+          exit 1
+        fi
+        echo "OK"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Fail if double /api/api still exists in src
+      shell: |
+        set -e
+        cd "{{ frontend_dir }}"
+        if grep -R --line-number "/api/api" src; then
+          echo "ERROR: Found double /api/api in src/"
+          exit 1
+        fi
+        echo "OK"
+      args:
+        executable: /bin/bash
+      changed_when: false

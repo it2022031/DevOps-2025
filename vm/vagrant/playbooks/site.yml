@@ -62,6 +62,7 @@
 
 # 7) Frontend env + build + service (dist server)
 - import_playbook: frontend_env.yml
+- import_playbook: frontend_patch_localhost.yml
 - import_playbook: frontend_build.yml
 - import_playbook: frontend_service.yml
 
