@@ -1,6 +1,6 @@
 ---
 - name: Install Nginx
-  hosts: backend
+  hosts: "{{ target_hosts }}"
   become: true
 
   tasks:

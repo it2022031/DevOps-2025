@@ -1,19 +1,28 @@
 ---
 - name: Write Nginx site config
-  hosts: backend
+  hosts: "{{ target_hosts }}"
   become: true
 
   vars:
     nginx_site: ds2025
-    backend_host: 127.0.0.1
-    backend_port: 8080
+    listen_port: 80
+
+    upstream_host: 127.0.0.1
+    upstream_port: 8080
+
     client_max_body_size: "50m"
+
+    # Optional API proxy (useful for FRONT)
+    enable_api_proxy: false
+    api_prefix: "/api/"
+    api_upstream_host: "10.10.10.11"
+    api_upstream_port: 80
 
   tasks:
     - name: Deploy nginx site config from template
       template:
-        src: ../templates/nginx_ds2025.conf.j2
-        dest: /etc/nginx/sites-available/{{ nginx_site }}
+        src: ../templates/nginx_site.conf.j2
+        dest: "/etc/nginx/sites-available/{{ nginx_site }}"
         mode: "0644"
       notify: restart nginx
 
