@@ -24,6 +24,13 @@ Vagrant.configure("2") do |config|
     # Open on host: http://127.0.0.1:8088
     h.vm.network "forwarded_port", guest: 80, host: 8088, auto_correct: true
 
+    # Host -> MailHog UI (runs on backend VM)
+    # Open on host: http://127.0.0.1:8025
+    h.vm.network "forwarded_port", guest: 8025, host: 8025, auto_correct: true
+
+    # (Optional) Host -> MailHog SMTP (useful for testing)
+    # h.vm.network "forwarded_port", guest: 1025, host: 1025, auto_correct: true
+
     h.vm.provider "virtualbox" do |vb|
       vb_defaults(vb)
     end
@@ -52,16 +59,9 @@ Vagrant.configure("2") do |config|
       netmask: "255.255.255.0",
       virtualbox__intnet: INTNET_NAME
 
-    # Host -> Frontend service (8081)
-    # Open on host: http://127.0.0.1:8081
-#     h.vm.network "forwarded_port", guest: 8081, host: 8081, auto_correct: true
-    h.vm.network "forwarded_port", guest: 80, host: 8090, auto_correct: true
-    h.vm.network "forwarded_port", guest: 8025, host: 8025, auto_correct: true
-
-
-    # (Optional, if you also run nginx on front at port 80)
+    # Host -> Front nginx (80)
     # Open on host: http://127.0.0.1:8090
-    # h.vm.network "forwarded_port", guest: 80, host: 8090, auto_correct: true
+    h.vm.network "forwarded_port", guest: 80, host: 8090, auto_correct: true
 
     h.vm.provider "virtualbox" do |vb|
       vb_defaults(vb)

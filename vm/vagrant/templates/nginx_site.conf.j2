@@ -1,31 +1,36 @@
 server {
-    listen {{ listen_port }};
-    server_name _;
+listen {{ listen_port }};
+server_name _;
 
-    client_max_body_size {{ client_max_body_size }};
+client_max_body_size {{ client_max_body_size }};
 
-    location / {
-        proxy_pass http://{{ upstream_host }}:{{ upstream_port }};
-        proxy_http_version 1.1;
+# FRONTEND (static server via node serve on 8081)
+location / {
+proxy_pass http://{{ upstream_host }}:{{ upstream_port }};
+proxy_http_version 1.1;
 
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
+proxy_set_header Host $host;
+proxy_set_header X-Real-IP $remote_addr;
+proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+proxy_set_header X-Forwarded-Proto $scheme;
 
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-    }
+proxy_set_header Upgrade $http_upgrade;
+proxy_set_header Connection "upgrade";
+}
 
 {% if enable_api_proxy %}
+    # API -> BACKEND
     location {{ api_prefix }} {
-        proxy_pass http://{{ api_upstream_host }}:{{ api_upstream_port }};
-        proxy_http_version 1.1;
+    proxy_pass http://{{ api_upstream_host }}:{{ api_upstream_port }};
+    proxy_http_version 1.1;
 
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+
+    # IMPORTANT: prevent Spring from treating this as a browser CORS request
+    proxy_set_header Origin "";
     }
 {% endif %}
 }

@@ -1,4 +1,3 @@
-# playbooks/backend_env.yml
 ---
 - name: Configure backend environment variables
   hosts: backend
@@ -24,6 +23,9 @@
     minio_endpoint: "http://127.0.0.1:9000"
     minio_access_key: minioadmin
     minio_secret_key: minioadmin123
+
+    # ✅ Public URL used in activation emails (host entrypoint)
+    app_public_base_url: "http://127.0.0.1:8090"
 
   tasks:
     - name: Ensure backend env directory exists
@@ -54,6 +56,9 @@
           MINIO_ENDPOINT={{ minio_endpoint }}
           MINIO_ACCESS_KEY={{ minio_access_key }}
           MINIO_SECRET_KEY={{ minio_secret_key }}
+
+          # ✅ Activation link base URL (used by EmailService)
+          APP_PUBLIC_BASE_URL={{ app_public_base_url }}
 
     - name: Show env file location
       debug:

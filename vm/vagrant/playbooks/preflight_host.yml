@@ -1,0 +1,33 @@
+---
+- name: Preflight checks on HOST (prevent port conflicts)
+  hosts: localhost
+  become: false
+  gather_facts: false
+
+  vars:
+    critical_ports: "1025|8025|8081|5432|9000|9001"
+
+  tasks:
+    - name: List running docker containers (if docker exists)
+      shell: |
+        command -v docker >/dev/null 2>&1 && docker ps --format '{{"{{"}}.Names{{"}}"}}\t{{"{{"}}.Ports{{"}}"}}' || true
+      args:
+        executable: /bin/bash
+      register: docker_running
+      changed_when: false
+
+    - name: Fail if docker containers are running (ports may conflict)
+      fail:
+        msg: |
+          Docker containers are running on the host and may conflict with Vagrant forwarded ports.
+          Stop them before running site.yml.
+          {{ docker_running.stdout }}
+      when: docker_running.stdout != ""
+
+    # (Optional) quick visibility: show what is listening anyway
+    - name: Show listeners on critical ports (info)
+      shell: |
+        ss -lntp | egrep ":({{ critical_ports }})" || true
+      args:
+        executable: /bin/bash
+      changed_when: false
