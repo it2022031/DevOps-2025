@@ -1,0 +1,51 @@
+---
+- name: Install NVM + Node.js 18 (LTS) + npm for vagrant user
+  hosts: front
+  become: true
+
+  vars:
+    node_version: "18"   # installs latest 18.x
+    nvm_dir: "/home/vagrant/.nvm"
+    nvm_version: "v0.39.7"   # stable nvm release (ok)
+
+  tasks:
+    - name: Ensure dependencies for nvm exist
+      apt:
+        name:
+          - curl
+          - ca-certificates
+          - git
+          - bash
+        state: present
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: Install NVM for vagrant user
+      become_user: vagrant
+      shell: |
+        set -e
+        if [ ! -s "{{ nvm_dir }}/nvm.sh" ]; then
+          curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/{{ nvm_version }}/install.sh | bash
+        fi
+      args:
+        executable: /bin/bash
+
+    - name: Ensure NVM is loaded in vagrant .bashrc (idempotent)
+      lineinfile:
+        path: /home/vagrant/.bashrc
+        create: true
+        line: 'export NVM_DIR="$HOME/.nvm" && [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"'
+        state: present
+
+    - name: Install Node.js (18.x) and set as default
+      become_user: vagrant
+      shell: |
+        set -e
+        export NVM_DIR="$HOME/.nvm"
+        . "$NVM_DIR/nvm.sh"
+        nvm install {{ node_version }}
+        nvm alias default {{ node_version }}
+        nvm use default
+        npm -v
+      args:
+        executable: /bin/bash

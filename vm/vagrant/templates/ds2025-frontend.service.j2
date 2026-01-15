@@ -1,0 +1,18 @@
+[Unit]
+Description=DS-2025 Vue Frontend (npm serve)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User={{ run_user }}
+WorkingDirectory={{ frontend_dir }}
+
+ExecStart=/bin/bash -lc 'export NVM_DIR="$HOME/.nvm"; . "$NVM_DIR/nvm.sh"; nvm use default; export HOST=0.0.0.0; export PORT={{ front_port }}; npm run serve -- --host 0.0.0.0'
+
+Restart=always
+RestartSec=3
+SuccessExitStatus=143
+
+[Install]
+WantedBy=multi-user.target

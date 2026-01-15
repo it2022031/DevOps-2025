@@ -1,0 +1,56 @@
+---
+- name: Configure frontend environment variables (.env)
+  hosts: front
+  become: true
+
+  vars:
+    project_dir: "/opt/DS-2025"
+
+    # 🔧 ΒΑΛΕ εδώ το πραγματικό path του Vue project
+    frontend_dir: "/opt/DS-2025/frontend/vue-argon-design-system-master"
+
+
+    env_file: "{{ frontend_dir }}/.env"
+
+    # Backend base URL (όπως το βλέπει το front VM)
+    backend_base_url: "http://10.10.10.11"   # αν έχεις nginx+port-forward κλπ, το αλλάζεις
+
+    app_owner: "vagrant"
+
+  tasks:
+    - name: Fail if frontend directory does not exist (helps debugging paths)
+      stat:
+        path: "{{ frontend_dir }}"
+      register: fe_dir
+
+    - name: Show frontend_dir exists
+      debug:
+        msg: "frontend_dir={{ frontend_dir }} exists={{ fe_dir.stat.exists }}"
+
+    - name: Create .env file if missing
+      file:
+        path: "{{ env_file }}"
+        state: touch
+        owner: "{{ app_owner }}"
+        group: "{{ app_owner }}"
+        mode: "0644"
+      when: fe_dir.stat.exists
+
+    # Γράφουμε/ενημερώνουμε μεταβλητές (Vue/Vite συνήθως θέλει VITE_)
+    - name: Set VITE_API_BASE_URL in .env (idempotent)
+      lineinfile:
+        path: "{{ env_file }}"
+        regexp: "^VITE_API_BASE_URL="
+        line: "VITE_API_BASE_URL={{ backend_base_url }}"
+        create: true
+      when: fe_dir.stat.exists
+
+    - name: Print .env content (debug)
+      command: cat "{{ env_file }}"
+      register: env_out
+      changed_when: false
+      when: fe_dir.stat.exists
+
+    - debug:
+        var: env_out.stdout_lines
+      when: fe_dir.stat.exists

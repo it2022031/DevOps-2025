@@ -21,6 +21,8 @@
 - import_playbook: java21.yml
 - import_playbook: maven.yml
 - import_playbook: clone_ds2025.yml
+  vars:
+    target_hosts: backend
 
 
 # 4) Backend runtime
@@ -39,3 +41,9 @@
 
 # 6) Healthchecks (optional)
 - import_playbook: healthcheck.yml
+
+- import_playbook: nvm_install.yml
+- import_playbook: nvm_verify.yml
+- import_playbook: clone_ds2025.yml
+  vars:
+    target_hosts: front

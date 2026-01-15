@@ -1,13 +1,13 @@
 ---
-- name: Clone or update DS-2025 repository on appserver
-  hosts: backend
+- name: Clone or update DS-2025 repository
+  hosts: "{{ target_hosts }}"
   become: true
 
   vars:
     repo_url: "https://github.com/it2022031/DS-2025.git"
     project_dir: "/opt/DS-2025"
     repo_version: "main-branch"
-    app_owner: "vagrant"   # ή άλλον χρήστη αν θες
+    app_owner: "vagrant"
 
   tasks:
     - name: Ensure git is installed
@@ -15,6 +15,7 @@
         name: git
         state: present
         update_cache: yes
+        cache_valid_time: 3600
 
     - name: Clone or update repository (idempotent)
       git:

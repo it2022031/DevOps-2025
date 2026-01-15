@@ -1,0 +1,22 @@
+---
+- name: Verify Node.js and npm versions (via nvm)
+  hosts: front
+  become: true
+
+  tasks:
+    - name: Show node/npm versions for vagrant
+      become_user: vagrant
+      shell: |
+        set -e
+        export NVM_DIR="$HOME/.nvm"
+        . "$NVM_DIR/nvm.sh"
+        node -v
+        npm -v
+      args:
+        executable: /bin/bash
+      register: versions
+      changed_when: false
+
+    - name: Print versions
+      debug:
+        var: versions.stdout_lines

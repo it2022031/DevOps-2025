@@ -1,0 +1,42 @@
+---
+- name: Create and run frontend systemd service (Vue)
+  hosts: front
+  become: true
+
+  vars:
+    app_name: ds2025-frontend
+    run_user: vagrant
+    frontend_dir: "/opt/DS-2025/frontend/vue-argon-design-system-master"
+
+    # Συνήθως Vue CLI serve βγαίνει στο 8080, αλλά το αλλάζουμε για να μην μπερδευτείς
+    front_port: 8081
+
+  tasks:
+    - name: Deploy systemd unit from template
+      template:
+        src: ../templates/ds2025-frontend.service.j2
+        dest: "/etc/systemd/system/{{ app_name }}.service"
+        mode: "0644"
+      notify: restart frontend
+
+    - name: Reload systemd
+      systemd:
+        daemon_reload: true
+
+    - name: Enable and start frontend service
+      systemd:
+        name: "{{ app_name }}"
+        enabled: true
+        state: started
+
+    - name: Wait for frontend port
+      wait_for:
+        host: 127.0.0.1
+        port: "{{ front_port }}"
+        timeout: 45
+
+  handlers:
+    - name: restart frontend
+      systemd:
+        name: "{{ app_name }}"
+        state: restarted

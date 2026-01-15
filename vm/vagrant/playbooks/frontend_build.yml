@@ -1,0 +1,60 @@
+---
+- name: Build VueJS frontend (npm install + npm run build)
+  hosts: front
+  become: true
+
+  vars:
+    frontend_dir: "/opt/DS-2025/frontend/vue-argon-design-system-master"
+    build_user: "vagrant"
+
+  tasks:
+    - name: Ensure frontend directory exists
+      stat:
+        path: "{{ frontend_dir }}"
+      register: fe_dir
+
+    - name: Fail if frontend directory missing
+      fail:
+        msg: "frontend_dir={{ frontend_dir }} does not exist. Fix the path."
+      when: not fe_dir.stat.exists
+
+    - name: Install dependencies (npm ci if lock exists, else npm install)
+      become_user: "{{ build_user }}"
+      shell: |
+        set -e
+        export NVM_DIR="$HOME/.nvm"
+        . "$NVM_DIR/nvm.sh"
+        cd "{{ frontend_dir }}"
+
+        if [ -f package-lock.json ]; then
+          npm ci
+        else
+          npm install
+        fi
+      args:
+        executable: /bin/bash
+
+    - name: Build production assets (dist/)
+      become_user: "{{ build_user }}"
+      shell: |
+        set -e
+        export NVM_DIR="$HOME/.nvm"
+        . "$NVM_DIR/nvm.sh"
+        cd "{{ frontend_dir }}"
+        npm run build
+      args:
+        executable: /bin/bash
+
+    - name: Verify dist/ exists
+      stat:
+        path: "{{ frontend_dir }}/dist"
+      register: dist_dir
+
+    - name: Fail if dist/ missing
+      fail:
+        msg: "Build finished but dist/ was not created in {{ frontend_dir }}"
+      when: not dist_dir.stat.exists
+
+    - name: Show dist/ top contents
+      command: ls -la "{{ frontend_dir }}/dist"
+      changed_when: false
