@@ -8,6 +8,7 @@
     project_dir: "/opt/DS-2025"
     repo_version: "main-branch"
     app_owner: "vagrant"
+    version_file: "/opt/DS-2025/VERSION"
 
   tasks:
     - name: Ensure git is installed
@@ -22,23 +23,37 @@
         path: "{{ project_dir }}/.git"
       register: repo_git
 
-    - name: Discard local changes if repo exists (reset + clean)
+    # ✅ If repo exists: hard-reset to remote branch and clean everything
+    - name: Discard local changes if repo exists (fetch + reset origin + clean)
       shell: |
         set -e
         cd "{{ project_dir }}"
-        git reset --hard
+        git fetch --all --prune
+        git reset --hard "origin/{{ repo_version }}"
         git clean -fd
       args:
         executable: /bin/bash
       when: repo_git.stat.exists
 
-    - name: Clone or update repository (idempotent)
+    # ✅ If repo does not exist: clone it
+    - name: Clone repository if missing
       git:
         repo: "{{ repo_url }}"
         dest: "{{ project_dir }}"
         version: "{{ repo_version }}"
         update: yes
-        force: no
+        force: yes
+      when: not repo_git.stat.exists
+
+    # ✅ If repo exists: ensure it's on the correct branch and forced to remote state
+    - name: Ensure repo is updated to the latest remote state (force)
+      git:
+        repo: "{{ repo_url }}"
+        dest: "{{ project_dir }}"
+        version: "{{ repo_version }}"
+        update: yes
+        force: yes
+      when: repo_git.stat.exists
 
     - name: Ensure correct ownership
       file:
@@ -47,6 +62,28 @@
         group: "{{ app_owner }}"
         recurse: yes
 
+    # ✅ Write running git commit into /opt/DS-2025/VERSION
+    - name: Write VERSION file with current commit
+      shell: |
+        set -e
+        cd "{{ project_dir }}"
+        git rev-parse --short HEAD > "{{ version_file }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Show VERSION (commit hash)
+      command: cat {{ version_file }}
+      register: ver_out
+      changed_when: false
+
     - name: Show repo status
       command: git -C {{ project_dir }} status -sb
+      register: status_out
       changed_when: false
+
+    - name: Print commit + status
+      debug:
+        msg:
+          - "VERSION={{ ver_out.stdout }}"
+          - "{{ status_out.stdout }}"

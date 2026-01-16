@@ -1,0 +1,62 @@
+---
+- name: Seed DB with test data (test_dedomena.sql) on dbvm
+  hosts: backend
+  become: true
+
+  vars:
+    db_host: "{{ hostvars['dbvm'].ip }}"
+    db_port: 5432
+    db_name: "demo_db"
+    db_user: "demo_user"
+    db_pass: "demo_pass"
+
+    project_dir: "/opt/DS-2025"
+    test_sql: "{{ project_dir }}/backend/demo/src/main/resources/db/migration/test_dedomena.sql"
+
+  tasks:
+    - name: Ensure psql client exists on backendvm
+      apt:
+        name: postgresql-client
+        state: present
+        update_cache: yes
+
+    - name: Ensure test_dedomena.sql exists on backendvm
+      stat:
+        path: "{{ test_sql }}"
+      register: test_sql_stat
+
+    - name: Fail if test_dedomena.sql missing
+      fail:
+        msg: "Missing SQL file on backendvm: {{ test_sql }}"
+      when: not test_sql_stat.stat.exists
+
+    - name: Wait for dbvm:5432 reachable
+      wait_for:
+        host: "{{ db_host }}"
+        port: "{{ db_port }}"
+        timeout: 20
+
+    - name: Load test data into PostgreSQL (dbvm)
+      shell: |
+        set -euo pipefail
+        export PGPASSWORD='{{ db_pass }}'
+        psql -v ON_ERROR_STOP=1 -h '{{ db_host }}' -p '{{ db_port }}' -U '{{ db_user }}' -d '{{ db_name }}' < '{{ test_sql }}'
+      args:
+        executable: /bin/bash
+
+    - name: Sanity check counts (users/properties)
+      shell: |
+        set -euo pipefail
+        export PGPASSWORD='{{ db_pass }}'
+        psql -h '{{ db_host }}' -p '{{ db_port }}' -U '{{ db_user }}' -d '{{ db_name }}' -c \
+        "select 'users' as t, count(*) from users
+         union all
+         select 'properties', count(*) from properties;"
+      args:
+        executable: /bin/bash
+      register: sanity
+      changed_when: false
+
+    - name: Print sanity output
+      debug:
+        var: sanity.stdout_lines

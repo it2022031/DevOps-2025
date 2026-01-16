@@ -1,0 +1,107 @@
+---
+- name: Copy photos to dbvm and run load_photos.sql (lo_import needs files on db server)
+  hosts: db
+  become: true
+
+  vars:
+    # Photos folder on YOUR PC (controller)
+    photos_src_local: "/home/tefkros/Desktop/DS-2025/photos"
+
+    # SQL file path on backendvm (repo is cloned there)
+    project_dir_backend: "/opt/DS-2025"
+    load_photos_sql_backend: "{{ project_dir_backend }}/backend/demo/src/main/resources/db/migration/load_photos.sql"
+
+    # Where we will place it on dbvm
+    load_photos_sql_dbvm: "/tmp/load_photos.sql"
+
+    db_name: "demo_db"
+
+  tasks:
+    - name: Ensure photos source exists on controller (your PC)
+      delegate_to: localhost
+      become: false
+      stat:
+        path: "{{ photos_src_local }}"
+      register: local_photos_stat
+
+    - name: Fail if local photos folder missing
+      fail:
+        msg: "Local photos folder not found: {{ photos_src_local }}"
+      when: not local_photos_stat.stat.exists
+
+    - name: Ensure /photos exists on dbvm
+      file:
+        path: /photos
+        state: directory
+        mode: "0755"
+
+    - name: Copy avatar_photos to dbvm:/photos/avatar_photos
+      copy:
+        src: "{{ photos_src_local }}/avatar_photos/"
+        dest: /photos/avatar_photos/
+        mode: "0644"
+
+    - name: Copy property_photos (with trailing space) to dbvm:/photos/property_photos_tmp
+      copy:
+        src: "{{ photos_src_local }}/property_photos /"
+        dest: /photos/property_photos_tmp/
+        mode: "0644"
+
+    - name: Normalize property photos folder name on dbvm
+      shell: |
+        set -e
+        rm -rf /photos/property_photos
+        mv /photos/property_photos_tmp /photos/property_photos
+        ls -la /photos
+      args:
+        executable: /bin/bash
+
+    # --- Bring load_photos.sql from backendvm -> controller -> dbvm (no scp) ---
+    - name: Fetch load_photos.sql from backendvm to controller (/tmp/load_photos.sql)
+      delegate_to: backendvm
+      become: true
+      fetch:
+        src: "{{ load_photos_sql_backend }}"
+        dest: "/tmp/load_photos.sql"
+        flat: true
+
+    - name: Copy load_photos.sql from controller to dbvm:/tmp/load_photos.sql (ansible copy)
+      copy:
+        src: "/tmp/load_photos.sql"
+        dest: "{{ load_photos_sql_dbvm }}"
+        mode: "0644"
+
+    - name: Run load_photos.sql on dbvm as postgres (ON_ERROR_STOP)
+      shell: |
+        set -euo pipefail
+        sudo -u postgres psql -d "{{ db_name }}" -v ON_ERROR_STOP=1 -f "{{ load_photos_sql_dbvm }}"
+      args:
+        executable: /bin/bash
+
+    - name: Sanity check property_photos count
+      shell: |
+        set -e
+        sudo -u postgres psql -d "{{ db_name }}" -c "select count(*) as property_photos from property_photos;"
+      args:
+        executable: /bin/bash
+      register: prop_count
+      changed_when: false
+
+    - name: Print property_photos count
+      debug:
+        var: prop_count.stdout_lines
+
+    - name: Sanity check avatars bytes
+      shell: |
+        set -e
+        sudo -u postgres psql -d "{{ db_name }}" -c \
+        "select username, profile_picture_filename, octet_length(profile_picture) as bytes
+         from users order by id limit 10;"
+      args:
+        executable: /bin/bash
+      register: avatars
+      changed_when: false
+
+    - name: Print avatars sample
+      debug:
+        var: avatars.stdout_lines
