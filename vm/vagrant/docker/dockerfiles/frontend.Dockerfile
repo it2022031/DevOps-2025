@@ -10,14 +10,12 @@ ARG REPO_BRANCH=main-branch
 RUN git clone --depth 1 --branch ${REPO_BRANCH} ${REPO_URL} app
 WORKDIR /src/app/frontend/vue-argon-design-system-master
 
-# Use nginx proxy path (/api) from the browser (same origin) -> no CORS
 ENV VUE_APP_API_BASE_URL=/api
 
-# Install deps first (caching)
 RUN npm ci || npm install
 
-# ---- PATCH: remove hardcoded localhost:8080 in source (use /api via nginx proxy) ----
-RUN set -euo pipefail; \
+# PATCH: remove hardcoded localhost:8080 (use /api via nginx proxy)
+RUN set -eu; \
     echo "== Before patch (localhost:8080 occurrences) =="; \
     grep -R --line-number "localhost:8080" src || true; \
     \
@@ -30,7 +28,6 @@ RUN set -euo pipefail; \
     echo "== After patch (localhost:8080 occurrences) =="; \
     grep -R --line-number "localhost:8080" src || true
 
-# Build
 RUN npm run build
 
 FROM nginx:alpine

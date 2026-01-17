@@ -22,12 +22,12 @@
       when: not compose_stat.stat.exists
 
     - name: Docker compose up (build)
-      command: docker-compose up -d --build
+      command: /usr/local/bin/docker-compose up -d --build
       args:
         chdir: "{{ compose_dir }}"
 
     - name: Show docker compose status
-      command: docker-compose ps
+      command: /usr/local/bin/docker-compose ps
       args:
         chdir: "{{ compose_dir }}"
       register: ps

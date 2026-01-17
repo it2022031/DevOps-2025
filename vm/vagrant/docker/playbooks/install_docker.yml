@@ -1,15 +1,20 @@
 ---
-- name: Install Docker + compose on Ubuntu
+- name: Install Docker + Docker Compose v2 on Ubuntu
   hosts: docker
   become: true
 
+  vars:
+    compose_version: "v2.24.6"
+    compose_url: "https://github.com/docker/compose/releases/download/{{ compose_version }}/docker-compose-linux-x86_64"
+    compose_dest: "/usr/local/bin/docker-compose"
+
   tasks:
-    - name: Install packages (docker + compose)
+    - name: Install required packages (docker, git, curl)
       apt:
         name:
           - docker.io
-          - docker-compose
           - git
+          - curl
         state: present
         update_cache: yes
         cache_valid_time: 3600
@@ -20,7 +25,21 @@
         state: started
         enabled: true
 
-    - name: Add vagrant user to docker group (optional, handy)
+    - name: Download docker-compose v2 binary
+      get_url:
+        url: "{{ compose_url }}"
+        dest: "{{ compose_dest }}"
+        mode: "0755"
+
+    - name: Verify docker-compose installation
+      command: "{{ compose_dest }} version"
+      register: compose_version_out
+      changed_when: false
+
+    - debug:
+        msg: "{{ compose_version_out.stdout }}"
+
+    - name: Add vagrant user to docker group (optional but useful)
       user:
         name: vagrant
         groups: docker

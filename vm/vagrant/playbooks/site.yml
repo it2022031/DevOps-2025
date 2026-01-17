@@ -4,7 +4,7 @@
 
 # 1) Common prep on all VMs
 - name: Common prep on all VMs
-  hosts: all
+  hosts: vms
   become: true
   tasks:
     - name: Ensure remote tmp dir exists
