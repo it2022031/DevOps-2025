@@ -1,0 +1,40 @@
+---
+- name: Front preflight (detect user + fix permissions)
+  hosts: front
+  become: true
+  gather_facts: true
+
+  vars:
+    project_dir: /opt/DS-2025/frontend/vue-argon-design-system-master
+
+  tasks:
+    - name: Pick a usable app user (prefer vagrant, else ubuntu, else ansible_user)
+      set_fact:
+        app_user: >-
+          {{
+            'vagrant' if (getent_passwd['vagrant'] is defined)
+            else ('ubuntu' if (getent_passwd['ubuntu'] is defined) else ansible_user)
+          }}
+      vars:
+        getent_passwd: "{{ ansible_facts.getent_passwd | default({}) }}"
+
+    - name: Ensure project dir exists
+      stat:
+        path: "{{ project_dir }}"
+      register: proj
+
+    - name: Fail if project dir missing
+      fail:
+        msg: "Project dir missing: {{ project_dir }}"
+      when: not proj.stat.exists
+
+    - name: Fix ownership for project_dir
+      file:
+        path: "{{ project_dir }}"
+        owner: "{{ app_user }}"
+        group: "{{ app_user }}"
+        recurse: true
+
+    - name: Show chosen app_user
+      debug:
+        msg: "Using app_user={{ app_user }} for frontend tasks"

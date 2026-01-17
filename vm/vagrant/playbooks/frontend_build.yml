@@ -2,31 +2,71 @@
 - name: Build frontend (npm install + npm run build)
   hosts: front
   become: true
+  gather_facts: true
 
   vars:
     frontend_dir: "/opt/DS-2025/frontend/vue-argon-design-system-master"
-    build_user: "vagrant"
 
   tasks:
-    - name: Install deps (npm ci/install)
-      become_user: "{{ build_user }}"
-      shell: |
-        set -e
-        export NVM_DIR="$HOME/.nvm"
-        . "$NVM_DIR/nvm.sh"
-        cd "{{ frontend_dir }}"
-        if [ -f package-lock.json ]; then npm ci; else npm install; fi
-      args: { executable: /bin/bash }
+    - name: Fail if frontend directory does not exist
+      stat:
+        path: "{{ frontend_dir }}"
+      register: fe_dir
 
-    - name: Build (dist/)
+    - name: Fail early if missing
+      fail:
+        msg: "Frontend dir missing: {{ frontend_dir }}"
+      when: not fe_dir.stat.exists
+
+    # Auto-detect build user (vagrant if exists, else ubuntu, else ansible_user)
+    - name: Detect build_user
+      set_fact:
+        build_user: >-
+          {{
+            'vagrant' if (ansible_facts.getent_passwd['vagrant'] is defined)
+            else ('ubuntu' if (ansible_facts.getent_passwd['ubuntu'] is defined) else ansible_user)
+          }}
+
+    - name: Ensure frontend dir owned by build_user (avoid EACCES)
+      file:
+        path: "{{ frontend_dir }}"
+        owner: "{{ build_user }}"
+        group: "{{ build_user }}"
+        recurse: true
+
+    # Optional: install node/npm via apt as fallback (so npm exists even if nvm missing)
+    - name: Ensure nodejs and npm exist (fallback)
+      apt:
+        name:
+          - nodejs
+          - npm
+        state: present
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: Install deps + build (use NVM if available, else system node)
       become_user: "{{ build_user }}"
       shell: |
-        set -e
-        export NVM_DIR="$HOME/.nvm"
-        . "$NVM_DIR/nvm.sh"
+        set -euo pipefail
         cd "{{ frontend_dir }}"
+
+        # Try NVM
+        export NVM_DIR="$HOME/.nvm"
+        if [ -s "$NVM_DIR/nvm.sh" ]; then
+          . "$NVM_DIR/nvm.sh"
+          nvm use default || true
+        fi
+
+        # Clean install if lock exists
+        if [ -f package-lock.json ]; then
+          npm ci || npm install
+        else
+          npm install
+        fi
+
         npm run build
-      args: { executable: /bin/bash }
+      args:
+        executable: /bin/bash
 
     - name: Verify dist exists
       stat:

@@ -1,0 +1,50 @@
+---
+- name: Fix frontend double /api and image URLs
+  hosts: front
+  become: true
+  gather_facts: true
+
+  vars:
+    frontend_dir: "/opt/DS-2025/frontend/vue-argon-design-system-master"
+
+  tasks:
+    - name: Detect app_user
+      set_fact:
+        app_user: >-
+          {{
+            'vagrant' if (ansible_facts.getent_passwd['vagrant'] is defined)
+            else ('ubuntu' if (ansible_facts.getent_passwd['ubuntu'] is defined) else ansible_user)
+          }}
+
+    - name: Patch common pattern `${this.baseURL}/api/` -> `${this.baseURL}/`
+      become_user: "{{ app_user }}"
+      shell: |
+        set -euo pipefail
+        cd "{{ frontend_dir }}"
+        find src/views -type f -name "*.vue" -print0 \
+          | xargs -0 sed -i 's|\\${this\\.baseURL}/api/|\\${this\\.baseURL}/|g'
+      args:
+        executable: /bin/bash
+
+    - name: Patch specific image URL pattern to be relative (/api/...)
+      become_user: "{{ app_user }}"
+      shell: |
+        set -euo pipefail
+        cd "{{ frontend_dir }}"
+        # If any file sets url with ${this.baseURL}/properties/photos, force it to /api/properties/photos
+        find src/views -type f -name "*.vue" -print0 \
+          | xargs -0 sed -i 's|url: `\\${this\\.baseURL}/properties/photos/\\${photo\\.id}`|url: `/api/properties/photos/\\${photo.id}`|g'
+        find src/views -type f -name "*.vue" -print0 \
+          | xargs -0 sed -i 's|url: \"\\${this\\.baseURL}/properties/photos/\\${photo\\.id}\"|url: \"/api/properties/photos/\\${photo.id}\"|g'
+      args:
+        executable: /bin/bash
+
+    - name: Ensure no /api/api remains in src/views
+      become_user: "{{ app_user }}"
+      shell: |
+        set -e
+        cd "{{ frontend_dir }}"
+        ! grep -R --line-number "/api/api" src/views
+      args:
+        executable: /bin/bash
+      changed_when: false

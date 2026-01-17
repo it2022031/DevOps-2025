@@ -1,0 +1,30 @@
+---
+- name: Block service worker and PWA files on front nginx
+  hosts: front
+  become: true
+  vars:
+    nginx_site_path: /etc/nginx/sites-enabled/ds2025-front
+
+  tasks:
+    - name: Insert SW blocking locations before location /
+      blockinfile:
+        path: "{{ nginx_site_path }}"
+        marker: "# {mark} ANSIBLE_SW_BLOCK"
+        insertafter: "client_max_body_size"
+        block: |
+          # Block PWA/service worker files (avoid stale cache + wrong content-type)
+          location = /service-worker.js { return 404; }
+          location = /manifest.json { return 404; }
+          location ~* /precache-manifest\..*\.js$ { return 404; }
+          location ~* /workbox-.*\.js$ { return 404; }
+      notify: restart nginx
+
+    - name: Validate nginx config
+      command: nginx -t
+      changed_when: false
+
+  handlers:
+    - name: restart nginx
+      service:
+        name: nginx
+        state: restarted

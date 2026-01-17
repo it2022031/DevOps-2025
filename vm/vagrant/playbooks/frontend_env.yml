@@ -1,24 +1,17 @@
 ---
-- name: Configure frontend environment variables (.env)
+- name: Configure frontend environment variables (.env / .env.production)
   hosts: front
   become: true
+  gather_facts: true
 
   vars:
-    project_dir: "/opt/DS-2025"
-
-    # 🔧 ΒΑΛΕ εδώ το πραγματικό path του Vue project
     frontend_dir: "/opt/DS-2025/frontend/vue-argon-design-system-master"
 
-
-    env_file: "{{ frontend_dir }}/.env"
-
-    # Backend base URL (όπως το βλέπει το front VM)
-    backend_base_url: "http://10.10.10.11"   # αν έχεις nginx+port-forward κλπ, το αλλάζεις
-
-    app_owner: "vagrant"
+    # Για nginx reverse proxy στο front: /api
+    backend_base_url: "/api"
 
   tasks:
-    - name: Fail if frontend directory does not exist (helps debugging paths)
+    - name: Fail if frontend directory does not exist
       stat:
         path: "{{ frontend_dir }}"
       register: fe_dir
@@ -27,30 +20,57 @@
       debug:
         msg: "frontend_dir={{ frontend_dir }} exists={{ fe_dir.stat.exists }}"
 
-    - name: Create .env file if missing
+    - name: Fail early if missing
+      fail:
+        msg: "Frontend dir missing: {{ frontend_dir }}"
+      when: not fe_dir.stat.exists
+
+    # Auto-detect app owner (vagrant if exists, else ubuntu, else ansible_user)
+    - name: Detect app_owner
+      set_fact:
+        app_owner: >-
+          {{
+            'vagrant' if (ansible_facts.getent_passwd['vagrant'] is defined)
+            else ('ubuntu' if (ansible_facts.getent_passwd['ubuntu'] is defined) else ansible_user)
+          }}
+
+    - name: Ensure frontend dir owned by app_owner (avoid EACCES)
       file:
-        path: "{{ env_file }}"
-        state: touch
+        path: "{{ frontend_dir }}"
+        owner: "{{ app_owner }}"
+        group: "{{ app_owner }}"
+        recurse: true
+
+    # Vue CLI uses VUE_APP_* vars (NOT VITE_*)
+    - name: Write .env (Vue CLI)
+      copy:
+        dest: "{{ frontend_dir }}/.env"
         owner: "{{ app_owner }}"
         group: "{{ app_owner }}"
         mode: "0644"
-      when: fe_dir.stat.exists
+        content: |
+          VUE_APP_API_BASE_URL={{ backend_base_url }}
 
-    # Γράφουμε/ενημερώνουμε μεταβλητές (Vue/Vite συνήθως θέλει VITE_)
-    - name: Set VITE_API_BASE_URL in .env (idempotent)
-      lineinfile:
-        path: "{{ env_file }}"
-        regexp: "^VITE_API_BASE_URL="
-        line: "VITE_API_BASE_URL={{ backend_base_url }}"
-        create: true
-      when: fe_dir.stat.exists
+    - name: Write .env.production (Vue CLI)
+      copy:
+        dest: "{{ frontend_dir }}/.env.production"
+        owner: "{{ app_owner }}"
+        group: "{{ app_owner }}"
+        mode: "0644"
+        content: |
+          VUE_APP_API_BASE_URL={{ backend_base_url }}
 
-    - name: Print .env content (debug)
-      command: cat "{{ env_file }}"
+    - name: Print env files (debug)
+      shell: |
+        set -e
+        echo "=== .env ==="
+        cat "{{ frontend_dir }}/.env"
+        echo "=== .env.production ==="
+        cat "{{ frontend_dir }}/.env.production"
+      args:
+        executable: /bin/bash
       register: env_out
       changed_when: false
-      when: fe_dir.stat.exists
 
     - debug:
         var: env_out.stdout_lines
-      when: fe_dir.stat.exists

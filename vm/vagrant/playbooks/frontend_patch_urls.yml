@@ -1,0 +1,41 @@
+---
+- name: Patch frontend hardcoded URLs (remove localhost:8080)
+  hosts: front
+  become: true
+  gather_facts: true
+
+  vars:
+    project_dir: /opt/DS-2025/frontend/vue-argon-design-system-master
+
+  tasks:
+    - name: Detect app_user
+      set_fact:
+        app_user: >-
+          {{
+            'vagrant' if (ansible_facts.getent_passwd['vagrant'] is defined)
+            else ('ubuntu' if (ansible_facts.getent_passwd['ubuntu'] is defined) else ansible_user)
+          }}
+
+    - name: Patch code (http://localhost:8080/api -> /api, http://localhost:8080 -> empty, /api/api -> /api)
+      become_user: "{{ app_user }}"
+      shell: |
+        set -euo pipefail
+        cd "{{ project_dir }}"
+        find src -type f \( -name "*.vue" -o -name "*.js" \) -print0 \
+          | xargs -0 sed -i 's|http://localhost:8080/api|/api|g'
+        find src -type f \( -name "*.vue" -o -name "*.js" \) -print0 \
+          | xargs -0 sed -i 's|http://localhost:8080||g'
+        find src -type f \( -name "*.vue" -o -name "*.js" \) -print0 \
+          | xargs -0 sed -i 's|/api/api/|/api/|g'
+      args:
+        executable: /bin/bash
+
+    - name: Fail if localhost remains
+      become_user: "{{ app_user }}"
+      shell: |
+        set -e
+        cd "{{ project_dir }}"
+        ! grep -R --line-number "localhost:8080" src
+      args:
+        executable: /bin/bash
+      changed_when: false

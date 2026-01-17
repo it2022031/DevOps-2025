@@ -1,0 +1,40 @@
+---
+- name: Force photo URLs to be relative (/api/...) everywhere
+  hosts: front
+  become: true
+  gather_facts: true
+
+  vars:
+    frontend_dir: "/opt/DS-2025/frontend/vue-argon-design-system-master"
+
+  tasks:
+    - name: Detect app_user
+      set_fact:
+        app_user: >-
+          {{
+            'vagrant' if (ansible_facts.getent_passwd['vagrant'] is defined)
+            else ('ubuntu' if (ansible_facts.getent_passwd['ubuntu'] is defined) else ansible_user)
+          }}
+
+    - name: Replace any absolute photo URLs with relative /api/properties/photos/
+      become_user: "{{ app_user }}"
+      shell: |
+        set -euo pipefail
+        cd "{{ frontend_dir }}"
+        # absolute -> relative
+        find src -type f \( -name "*.vue" -o -name "*.js" \) -print0 \
+          | xargs -0 sed -i 's|http://127.0.0.1/api/properties/photos/|/api/properties/photos/|g'
+        find src -type f \( -name "*.vue" -o -name "*.js" \) -print0 \
+          | xargs -0 sed -i 's|http://localhost:8080/api/properties/photos/|/api/properties/photos/|g'
+      args:
+        executable: /bin/bash
+
+    - name: Debug - show any remaining absolute photo URLs
+      become_user: "{{ app_user }}"
+      shell: |
+        set -e
+        cd "{{ frontend_dir }}"
+        grep -R --line-number -E 'http://127\.0\.0\.1/api/properties/photos/|http://localhost:8080/api/properties/photos/' src || true
+      args:
+        executable: /bin/bash
+      changed_when: false

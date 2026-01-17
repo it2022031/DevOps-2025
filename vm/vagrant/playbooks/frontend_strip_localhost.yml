@@ -1,0 +1,70 @@
+---
+- name: Strip hardcoded localhost:8080 from frontend source (safe)
+  hosts: front
+  become: true
+  gather_facts: true
+
+  vars:
+    frontend_dir: "/opt/DS-2025/frontend/vue-argon-design-system-master"
+    # allowlist patterns (lines allowed to contain localhost)
+    allow_regex: "If it's absolute|strip host|example|docs|documentation|comment"
+
+  tasks:
+    - name: Detect app_user
+      set_fact:
+        app_user: >-
+          {{
+            'vagrant' if (ansible_facts.getent_passwd['vagrant'] is defined)
+            else ('ubuntu' if (ansible_facts.getent_passwd['ubuntu'] is defined) else ansible_user)
+          }}
+
+    - name: Ensure frontend_dir owned by app_user (avoid sed permission issues)
+      file:
+        path: "{{ frontend_dir }}"
+        owner: "{{ app_user }}"
+        group: "{{ app_user }}"
+        recurse: true
+
+    - name: Replace hardcoded backend URLs in src (only *.vue/*.js)
+      become_user: "{{ app_user }}"
+      shell: |
+        set -euo pipefail
+        cd "{{ frontend_dir }}"
+
+        # Replace full API base first
+        find src -type f \( -name "*.vue" -o -name "*.js" \) -print0 \
+          | xargs -0 sed -i 's|http://localhost:8080/api|/api|g'
+
+        # Replace any remaining host part
+        find src -type f \( -name "*.vue" -o -name "*.js" \) -print0 \
+          | xargs -0 sed -i 's|http://localhost:8080||g'
+      args:
+        executable: /bin/bash
+
+    - name: Show remaining localhost occurrences (debug)
+      become_user: "{{ app_user }}"
+      shell: |
+        set -e
+        cd "{{ frontend_dir }}"
+        grep -R --line-number "http://localhost:8080" src || true
+      args:
+        executable: /bin/bash
+      register: leftovers
+      changed_when: false
+
+    - name: Fail if localhost remains outside allowed comment/doc lines
+      become_user: "{{ app_user }}"
+      shell: |
+        set -euo pipefail
+        cd "{{ frontend_dir }}"
+        # show offenders, then fail
+        offenders="$(grep -R --line-number "http://localhost:8080" src | grep -Ev "{{ allow_regex }}" || true)"
+        if [ -n "$offenders" ]; then
+          echo "❌ Found forbidden hardcoded localhost URLs:"
+          echo "$offenders"
+          exit 1
+        fi
+        echo "✅ No forbidden hardcoded localhost URLs found."
+      args:
+        executable: /bin/bash
+      changed_when: false

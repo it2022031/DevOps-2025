@@ -1,37 +1,51 @@
 ---
-- name: Patch frontend hardcoded backend URLs
+- name: Patch frontend API URLs and rebuild (avoid /api/api and wrong base)
   hosts: front
   become: true
 
   vars:
     frontend_dir: "/opt/DS-2025/frontend/vue-argon-design-system-master"
+    front_service_name: "ds2025-frontend"   # άλλαξέ το αν λέγεται αλλιώς
+    nginx_service_name: "nginx"
 
   tasks:
     - name: Patch api paths in src (no localhost and no double /api)
       shell: |
-        set -e
+        set -euo pipefail
         cd "{{ frontend_dir }}"
 
         # 1) localhost:8080 -> /api
         find src -type f \( -name "*.js" -o -name "*.vue" \) -print0 \
           | xargs -0 sed -i "s|http://localhost:8080|/api|g"
 
-        # 2) fix any /api/api -> /api
+        # 2) literal /api/api -> /api (classic)
         find src -type f \( -name "*.js" -o -name "*.vue" \) -print0 \
           | xargs -0 sed -i "s|/api/api/|/api/|g"
         find src -type f \( -name "*.js" -o -name "*.vue" \) -print0 \
           | xargs -0 sed -i "s|/api/api\"|/api\"|g"
 
-        # 3) fix api.js baseURL explicitly (if exists)
+        # 3) Fix api.js baseURL explicitly (if exists)
         if [ -f src/api.js ]; then
           sed -i 's|baseURL:[[:space:]]*\"/api/api\"|baseURL: \"/api\"|g' src/api.js
         fi
+
         # 4) Fix Register.vue paths when API_BASE already includes /api
         if [ -f src/views/Register.vue ]; then
           sed -i 's|`${API_BASE}/api/auth/register`|`${API_BASE}/auth/register`|g' src/views/Register.vue
           sed -i 's|`${API_BASE}/api/auth/login`|`${API_BASE}/auth/login`|g' src/views/Register.vue
           sed -i 's|`${API_BASE}/api/users/me`|`${API_BASE}/users/me`|g' src/views/Register.vue
         fi
+
+        # 5) IMPORTANT: Fix patterns like `${this.baseURL}/api/...`
+        # When baseURL already equals "/api", appending "/api/.." produces "/api/api/.."
+        # So we drop the extra "/api" after the baseURL.
+        find src -type f -name "*.vue" -print0 \
+          | xargs -0 sed -i 's|\\${this\\.baseURL}/api/|\\${this\\.baseURL}/|g'
+
+        # 6) Also handle other common base vars (if you use baseUrl instead of baseURL)
+        find src -type f -name "*.vue" -print0 \
+          | xargs -0 sed -i 's|\\${this\\.baseUrl}/api/|\\${this\\.baseUrl}/|g'
+
       args:
         executable: /bin/bash
 
@@ -39,11 +53,7 @@
       shell: |
         set -e
         cd "{{ frontend_dir }}"
-        if grep -R --line-number "http://localhost:8080" src; then
-          echo "ERROR: Found hardcoded backend URL in src/"
-          exit 1
-        fi
-        echo "OK"
+        ! grep -R --line-number "http://localhost:8080" src
       args:
         executable: /bin/bash
       changed_when: false
@@ -52,11 +62,34 @@
       shell: |
         set -e
         cd "{{ frontend_dir }}"
-        if grep -R --line-number "/api/api" src; then
-          echo "ERROR: Found double /api/api in src/"
-          exit 1
-        fi
-        echo "OK"
+        ! grep -R --line-number "/api/api" src
       args:
         executable: /bin/bash
       changed_when: false
+
+    - name: Build frontend (npm install + npm run build) via nvm for vagrant user
+      shell: |
+        set -euo pipefail
+        export HOME=/home/vagrant
+        export NVM_DIR="$HOME/.nvm"
+        . "$NVM_DIR/nvm.sh"
+        nvm use default
+        cd "{{ frontend_dir }}"
+        npm ci || npm install
+        npm run build
+      args:
+        executable: /bin/bash
+      become_user: vagrant
+
+
+    - name: Restart frontend service (if exists)
+      shell: |
+        set -e
+        systemctl restart {{ front_service_name }} || true
+      args:
+        executable: /bin/bash
+
+    - name: Restart nginx
+      service:
+        name: "{{ nginx_service_name }}"
+        state: restarted

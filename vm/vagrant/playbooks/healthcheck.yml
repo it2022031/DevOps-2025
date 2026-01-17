@@ -1,4 +1,3 @@
-# playbooks/healthcheck.yml
 ---
 - name: Healthcheck DB (PostgreSQL)
   hosts: db
@@ -25,7 +24,8 @@
   hosts: backend
   become: true
   vars:
-    db_host: "{{ hostvars['dbvm'].ip }}"
+    # safe: prefer ip var, else fallback to known IP
+    db_host: "{{ hostvars['dbvm'].ip | default('10.10.10.12') }}"
     db_port: 5432
   tasks:
     - name: Ensure netcat exists

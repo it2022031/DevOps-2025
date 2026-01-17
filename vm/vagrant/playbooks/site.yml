@@ -1,6 +1,8 @@
 ---
+# 0) Host preflight (optional αλλά καλό)
 - import_playbook: preflight_host.yml
-# 0) Common fixes / prerequisites (all hosts)
+
+# 1) Common prep on all VMs
 - name: Common prep on all VMs
   hosts: all
   become: true
@@ -11,14 +13,14 @@
         state: directory
         mode: "1777"
 
-# 1) Database
+# 2) Database
 - import_playbook: postgres.yml
 
-# 2) Supporting services on backend host
+# 3) Supporting services on backend
 - import_playbook: minio.yml
 - import_playbook: mailhog.yml
 
-# 3) Backend prerequisites + code
+# 4) Backend prerequisites + code
 - import_playbook: java21.yml
 - import_playbook: maven.yml
 
@@ -26,12 +28,12 @@
   vars:
     target_hosts: backend
 
-# 4) Backend runtime
+# 5) Backend runtime
 - import_playbook: backend_env.yml
 - import_playbook: build_backend.yml
 - import_playbook: backend_service.yml
 
-# 5) Backend Nginx (proxy :80 -> :8080)
+# 6) Backend Nginx (proxy :80 -> :8080)
 - import_playbook: nginx_install.yml
   vars:
     target_hosts: backend
@@ -53,7 +55,7 @@
   vars:
     target_hosts: backend
 
-# 6) Frontend prerequisites (nvm/node/npm) + code
+# 7) Frontend prerequisites + code
 - import_playbook: nvm_install.yml
 - import_playbook: nvm_verify.yml
 
@@ -61,13 +63,14 @@
   vars:
     target_hosts: front
 
-# 7) Frontend env + build + service (dist server)
+# 8) Frontend env + build + service (serve dist on :8081)
 - import_playbook: frontend_env.yml
-- import_playbook: frontend_patch_localhost.yml
+- import_playbook: frontend_strip_localhost.yml   # ✅ ΠΡΟΣΩΡΙΝΑ (μέχρι να καθαρίσεις όλα τα views)
 - import_playbook: frontend_build.yml
 - import_playbook: frontend_service.yml
 
-# 8) Front Nginx (proxy :80 -> :8081, and /api -> backend)
+
+# 9) Front Nginx (proxy :80 -> :8081, and /api -> backend:8080)
 - import_playbook: nginx_install.yml
   vars:
     target_hosts: front
@@ -81,7 +84,7 @@
     enable_api_proxy: true
     api_prefix: "/api/"
     api_upstream_host: 10.10.10.11
-    api_upstream_port: 80
+    api_upstream_port: 8080
 
 - import_playbook: nginx_enable_site.yml
   vars:
@@ -92,5 +95,9 @@
   vars:
     target_hosts: front
 
-# 9) Healthchecks (τρέξε το στο τέλος μία φορά)
+# 10) Optional one-time data (uncomment if you want)
+# - import_playbook: seed_db.yml
+# - import_playbook: load_photos_dbvm.yml
+
+# 11) Healthchecks
 - import_playbook: healthcheck.yml
