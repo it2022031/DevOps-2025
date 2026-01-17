@@ -1,0 +1,49 @@
+---
+# 1) Install docker on the dockerhost VM
+- import_playbook: install_docker.yml
+
+# 2) Bring up docker-compose stack
+- name: Bring up DS-2025 docker-compose
+  hosts: docker
+  become: true
+
+  vars:
+    compose_dir: "/vagrant/docker"
+
+  tasks:
+    - name: Ensure docker-compose.yml exists
+      stat:
+        path: "{{ compose_dir }}/docker-compose.yml"
+      register: compose_stat
+
+    - name: Fail if docker-compose.yml missing
+      fail:
+        msg: "Missing docker-compose.yml at {{ compose_dir }}/docker-compose.yml"
+      when: not compose_stat.stat.exists
+
+    - name: Docker compose up (build)
+      command: docker-compose up -d --build
+      args:
+        chdir: "{{ compose_dir }}"
+
+    - name: Show docker compose status
+      command: docker-compose ps
+      args:
+        chdir: "{{ compose_dir }}"
+      register: ps
+      changed_when: false
+
+    - debug:
+        var: ps.stdout_lines
+
+    - name: Wait for frontend (published on 8081)
+      wait_for:
+        host: 127.0.0.1
+        port: 8081
+        timeout: 120
+
+    - name: Wait for backend (published on 8080)
+      wait_for:
+        host: 127.0.0.1
+        port: 8080
+        timeout: 120

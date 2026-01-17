@@ -1,0 +1,27 @@
+---
+- name: Install Docker + compose on Ubuntu
+  hosts: docker
+  become: true
+
+  tasks:
+    - name: Install packages (docker + compose)
+      apt:
+        name:
+          - docker.io
+          - docker-compose
+          - git
+        state: present
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: Ensure docker service is running
+      service:
+        name: docker
+        state: started
+        enabled: true
+
+    - name: Add vagrant user to docker group (optional, handy)
+      user:
+        name: vagrant
+        groups: docker
+        append: yes

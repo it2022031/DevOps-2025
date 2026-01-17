@@ -1,0 +1,75 @@
+services:
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: demo_db
+      POSTGRES_USER: demo_user
+      POSTGRES_PASSWORD: demo_pass
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U demo_user -d demo_db"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  mailhog:
+    image: mailhog/mailhog
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+
+  minio:
+    image: minio/minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin123
+    volumes:
+      - minio_data:/data
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+
+  backend:
+    build:
+      context: .
+      dockerfile: dockerfiles/backend.Dockerfile
+      args:
+        REPO_URL: "https://github.com/it2022031/DS-2025.git"
+        REPO_BRANCH: "main-branch"
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/demo_db
+      SPRING_DATASOURCE_USERNAME: demo_user
+      SPRING_DATASOURCE_PASSWORD: demo_pass
+      SPRING_MAIL_HOST: mailhog
+      SPRING_MAIL_PORT: 1025
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin123
+      APP_PUBLIC_BASE_URL: http://localhost:8081
+      APP_FRONTEND_URL: http://localhost:8081
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+
+  frontend:
+    build:
+      context: .
+      dockerfile: dockerfiles/frontend.Dockerfile
+      args:
+        REPO_URL: "https://github.com/it2022031/DS-2025.git"
+        REPO_BRANCH: "main-branch"
+    depends_on:
+      - backend
+    ports:
+      - "8081:80"
+
+volumes:
+  pgdata:
+  minio_data:
