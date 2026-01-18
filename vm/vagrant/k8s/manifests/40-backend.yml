@@ -1,0 +1,70 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+  namespace: ds2025
+spec:
+  selector:
+    app: backend
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: ds2025
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      containers:
+        - name: backend
+          image: ghcr.io/it2022031/ds2025-backend:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+          env:
+            # Use your docker profile (you already have application-docker.properties)
+            - name: SPRING_PROFILES_ACTIVE
+              value: docker
+
+            # DB (Service name "db")
+            - name: SPRING_DATASOURCE_URL
+              value: jdbc:postgresql://db:5432/demo_db
+            - name: SPRING_DATASOURCE_USERNAME
+              value: demo_user
+            - name: SPRING_DATASOURCE_PASSWORD
+              value: demo_pass
+
+            # MailHog (Service name "mailhog")
+            - name: SPRING_MAIL_HOST
+              value: mailhog
+            - name: SPRING_MAIL_PORT
+              value: "1025"
+
+            # MinIO (Service name "minio")
+            - name: MINIO_URL
+              value: http://minio:9000
+            - name: MINIO_ACCESS_KEY
+              value: minioadmin
+            - name: MINIO_SECRET_KEY
+              value: minioadmin123
+            # Αυτό είναι το bucket που έχεις στα application(-docker).properties
+            - name: MINIO_BUCKET
+              value: property-docs
+
+            # Public base for activation links (θα το αλλάξουμε όταν βάλουμε Ingress/FQDN)
+            - name: APP_PUBLIC_BASE_URL
+              value: http://localhost:8082
+            - name: APP_FRONTEND_URL
+              value: http://localhost:8082
