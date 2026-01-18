@@ -1,0 +1,87 @@
+---
+- name: Seed PostgreSQL in Kubernetes (ConfigMap + Job 15) + sanity checks
+  hosts: k8s
+  become: true
+
+  vars:
+    ns: ds2025
+    sql_file_on_vm: /vagrant/sqlData/test_dedomena.sql
+    job_manifest_on_vm: /vagrant/k8s/manifests/15-postgres-seed-job.yml
+
+    db_user: demo_user
+    db_name: demo_db
+
+  tasks:
+    - name: Ensure test_dedomena.sql exists on k8shost (synced folder)
+      stat:
+        path: "{{ sql_file_on_vm }}"
+      register: sql_stat
+
+    - name: Fail if test_dedomena.sql missing
+      fail:
+        msg: "Missing {{ sql_file_on_vm }}. Put test_dedomena.sql under vm/vagrant/sqlData/"
+      when: not sql_stat.stat.exists
+
+    - name: Ensure Postgres pod is Ready
+      shell: |
+        set -e
+        microk8s kubectl -n {{ ns }} wait --for=condition=Ready pod/postgres-0 --timeout=600s
+      args:
+        executable: /bin/bash
+
+    - name: Create/update ConfigMap ds2025-seed-sql from sqlData/test_dedomena.sql
+      shell: |
+        set -e
+        microk8s kubectl -n {{ ns }} create configmap ds2025-seed-sql \
+          --from-file=test_dedomena.sql={{ sql_file_on_vm }} \
+          --dry-run=client -o yaml | microk8s kubectl apply -f -
+      args:
+        executable: /bin/bash
+
+    - name: Delete previous seed job if exists
+      shell: |
+        set -e
+        microk8s kubectl -n {{ ns }} delete job postgres-seed --ignore-not-found
+      args:
+        executable: /bin/bash
+
+    - name: Apply seed job manifest (15-postgres-seed-job.yml)
+      shell: |
+        set -e
+        microk8s kubectl apply -f {{ job_manifest_on_vm }}
+      args:
+        executable: /bin/bash
+
+    - name: Wait for seed job completion
+      shell: |
+        set -e
+        microk8s kubectl -n {{ ns }} wait --for=condition=complete job/postgres-seed --timeout=600s
+      args:
+        executable: /bin/bash
+
+    - name: Show seed job logs
+      shell: |
+        set -e
+        microk8s kubectl -n {{ ns }} logs job/postgres-seed --tail=200
+      args:
+        executable: /bin/bash
+      register: job_logs
+      changed_when: false
+
+    - debug:
+        var: job_logs.stdout_lines
+
+    - name: Sanity check counts (users/properties)
+      shell: |
+        set -e
+        microk8s kubectl -n {{ ns }} exec -i postgres-0 -- \
+          psql -U {{ db_user }} -d {{ db_name }} -c "select 'users' as t, count(*) from users
+          union all
+          select 'properties' as t, count(*) from properties;"
+      args:
+        executable: /bin/bash
+      register: sanity
+      changed_when: false
+
+    - debug:
+        var: sanity.stdout_lines

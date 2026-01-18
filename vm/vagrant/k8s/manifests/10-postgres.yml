@@ -41,6 +41,46 @@ spec:
       labels:
         app: postgres
     spec:
+      # --- INIT: prepare /photos from /photos_src (handles trailing-space folder) ---
+      initContainers:
+        - name: prepare-photos
+          image: busybox:1.36
+          command: ["sh", "-lc"]
+          args:
+            - |
+              set -e
+
+              mkdir -p /photos
+              # clear contents but DO NOT remove the mount point
+              rm -rf /photos/* /photos/.* 2>/dev/null || true
+
+              # copy avatars
+              if [ -d "/photos_src/avatar_photos" ]; then
+                (cd /photos_src && tar -cf - avatar_photos) | (cd /photos && tar -xf -)
+              fi
+
+              # copy property photos (handle trailing space)
+              if [ -d "/photos_src/property_photos " ]; then
+                (cd /photos_src && tar -cf - "property_photos ") | (cd /photos && tar -xf -)
+                rm -rf /photos/property_photos
+                mv "/photos/property_photos " /photos/property_photos
+              elif [ -d "/photos_src/property_photos" ]; then
+                (cd /photos_src && tar -cf - property_photos) | (cd /photos && tar -xf -)
+              else
+                echo "No property_photos folder found under /photos_src"
+                exit 1
+              fi
+
+              echo "Prepared photos:"
+              ls -la /photos
+          volumeMounts:
+            - name: photos-src
+              mountPath: /photos_src
+              readOnly: true
+            - name: photos-work
+              mountPath: /photos
+
+
       containers:
         - name: postgres
           image: postgres:15
@@ -57,6 +97,9 @@ spec:
           volumeMounts:
             - name: pgdata
               mountPath: /var/lib/postgresql/data
+            # this is what load_photos.sql expects: /photos/...
+            - name: photos-work
+              mountPath: /photos
           readinessProbe:
             exec:
               command: ["sh", "-lc", "pg_isready -U demo_user -d demo_db"]
@@ -67,7 +110,18 @@ spec:
               command: ["sh", "-lc", "pg_isready -U demo_user -d demo_db"]
             initialDelaySeconds: 15
             periodSeconds: 10
+
       volumes:
         - name: pgdata
           persistentVolumeClaim:
             claimName: pgdata
+
+        # read-only source from the VM (Vagrant synced folder inside k8shost)
+        - name: photos-src
+          hostPath:
+            path: /vagrant/sqlData/photos
+            type: Directory
+
+        # writable working dir inside the pod
+        - name: photos-work
+          emptyDir: {}

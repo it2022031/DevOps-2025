@@ -1,0 +1,80 @@
+---
+- name: Apply core Kubernetes manifests (ds2025)
+  hosts: k8s
+  become: true
+
+  vars:
+    ns: ds2025
+    manifests_dir: /vagrant/k8s/manifests
+
+    core_files:
+      - 00-namespace.yml
+      - 10-postgres.yml
+      - 20-minio.yml
+      - 30-mailhog.yml
+      - 40-backend.yml
+      - 50-frontend.yml
+      - 60-ingress.yml
+
+  tasks:
+    - name: Apply core manifests (in order)
+      shell: |
+        set -e
+        for f in {{ core_files | join(' ') }}; do
+          echo "== apply: $f =="
+          microk8s kubectl apply -f "{{ manifests_dir }}/$f"
+        done
+      args:
+        executable: /bin/bash
+
+    # Wait for core pods to be ready
+    - name: Wait for Postgres pod ready
+      shell: |
+        set -e
+        microk8s kubectl -n {{ ns }} wait --for=condition=Ready pod/postgres-0 --timeout=600s
+      args:
+        executable: /bin/bash
+
+    - name: Wait for MinIO pod ready
+      shell: |
+        set -e
+        microk8s kubectl -n {{ ns }} wait --for=condition=Ready pod -l app=minio --timeout=300s
+      args:
+        executable: /bin/bash
+
+    - name: Wait for MailHog pod ready
+      shell: |
+        set -e
+        microk8s kubectl -n {{ ns }} wait --for=condition=Ready pod -l app=mailhog --timeout=300s
+      args:
+        executable: /bin/bash
+
+    - name: Wait for Backend pod ready
+      shell: |
+        set -e
+        microk8s kubectl -n {{ ns }} wait --for=condition=Ready pod -l app=backend --timeout=600s
+      args:
+        executable: /bin/bash
+
+    - name: Wait for Frontend pod ready
+      shell: |
+        set -e
+        microk8s kubectl -n {{ ns }} wait --for=condition=Ready pod -l app=frontend --timeout=600s
+      args:
+        executable: /bin/bash
+
+    - name: Show pods/services/ingress
+      shell: |
+        set -e
+        microk8s kubectl -n {{ ns }} get pods
+        echo "-----"
+        microk8s kubectl -n {{ ns }} get svc
+        echo "-----"
+        microk8s kubectl -n {{ ns }} get ingress
+      args:
+        executable: /bin/bash
+      register: status
+      changed_when: false
+
+    - debug:
+        var: status.stdout_lines

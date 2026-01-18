@@ -1,0 +1,36 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: postgres-load-photos
+  namespace: ds2025
+spec:
+  backoffLimit: 1
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: load
+          image: postgres:15
+          env:
+            - name: PGPASSWORD
+              value: demo_pass
+          volumeMounts:
+            - name: load-sql
+              mountPath: /seed
+          command:
+            - sh
+            - -lc
+            - |
+              echo "Waiting for postgres..."
+              until pg_isready -h db -p 5432 -U demo_user -d demo_db; do
+                sleep 2
+              done
+
+              echo "Running load_photos.sql..."
+              psql -h db -U demo_user -d demo_db -v ON_ERROR_STOP=1 -f /seed/load_photos.sql
+
+              echo "Load photos completed"
+      volumes:
+        - name: load-sql
+          configMap:
+            name: ds2025-load-photos-sql

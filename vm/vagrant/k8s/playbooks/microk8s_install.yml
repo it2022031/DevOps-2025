@@ -4,7 +4,7 @@
   become: true
 
   vars:
-    microk8s_channel: "1.29/stable"   # ok for 2026, stable
+    microk8s_channel: "1.29/stable"
     addons:
       - dns
       - storage
@@ -18,11 +18,45 @@
         state: present
         update_cache: yes
 
-    - name: Install MicroK8s
-      snap:
-        name: microk8s
-        classic: true
-        channel: "{{ microk8s_channel }}"
+    - name: Ensure snapd service is running
+      service:
+        name: snapd
+        state: started
+        enabled: true
+
+    - name: Wait for snapd to be ready (seeding)
+      shell: |
+        set -e
+        # wait up to ~2 minutes for snapd seeding to complete
+        for i in $(seq 1 60); do
+          if snap list >/dev/null 2>&1; then
+            echo "snapd is ready"
+            exit 0
+          fi
+          sleep 2
+        done
+        echo "snapd not ready in time"
+        snap changes || true
+        exit 1
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Install MicroK8s via snap (idempotent + retries)
+      shell: |
+        set -e
+        if ! snap list | awk '{print $1}' | grep -qx microk8s; then
+          snap install microk8s --classic --channel="{{ microk8s_channel }}"
+        else
+          echo "microk8s already installed"
+        fi
+      args:
+        executable: /bin/bash
+      register: install_out
+      retries: 10
+      delay: 6
+      until: install_out.rc == 0
+      changed_when: false
 
     - name: Add vagrant user to microk8s group
       user:
@@ -39,17 +73,33 @@
         mode: "0700"
 
     - name: Wait for MicroK8s to be ready
-      command: microk8s status --wait-ready
+      command: sudo microk8s status --wait-ready
       changed_when: false
 
-    - name: Enable MicroK8s addons (dns, storage, ingress, metrics-server)
-      command: "microk8s enable {{ addons | join(' ') }}"
-      register: enable_out
-      changed_when: "'Nothing to do' not in (enable_out.stdout + enable_out.stderr)"
+    - name: Enable MicroK8s addons (safe rerun)
+      shell: |
+        set -e
+        for a in {{ addons | join(' ') }}; do
+          if sudo microk8s status | grep -q "^\s*$a\s\+.*enabled"; then
+            echo "addon $a already enabled"
+          else
+            echo "enabling addon $a"
+            sudo microk8s enable "$a"
+          fi
+        done
+      args:
+        executable: /bin/bash
+      changed_when: false
 
-    - name: Show enabled addons output
-      debug:
-        var: enable_out.stdout_lines
+    - name: Write kubeconfig for vagrant (optional)
+      shell: |
+        set -e
+        sudo microk8s config > /home/vagrant/.kube/config
+        chown vagrant:vagrant /home/vagrant/.kube/config
+        chmod 600 /home/vagrant/.kube/config
+      args:
+        executable: /bin/bash
+      changed_when: false
 
     - name: Create kubectl alias in vagrant .bashrc (optional)
       lineinfile:
@@ -58,7 +108,7 @@
         state: present
 
     - name: Print nodes
-      command: microk8s kubectl get nodes -o wide
+      command: sudo microk8s kubectl get nodes -o wide
       register: nodes
       changed_when: false
 

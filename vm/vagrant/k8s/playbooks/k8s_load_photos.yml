@@ -1,0 +1,99 @@
+---
+- name: Load photos into PostgreSQL in Kubernetes (ConfigMap + Job 16) + sanity checks
+  hosts: k8s
+  become: true
+
+  vars:
+    ns: ds2025
+
+    load_sql_on_vm: /vagrant/sqlData/load_photos.sql
+    job_manifest_on_vm: /vagrant/k8s/manifests/16-postgres-load-photos-job.yml
+
+    db_user: demo_user
+    db_name: demo_db
+
+  tasks:
+    - name: Ensure load_photos.sql exists on k8shost (synced folder)
+      stat:
+        path: "{{ load_sql_on_vm }}"
+      register: sql_stat
+
+    - name: Fail if load_photos.sql missing
+      fail:
+        msg: "Missing {{ load_sql_on_vm }}. Put load_photos.sql under vm/vagrant/sqlData/"
+      when: not sql_stat.stat.exists
+
+    - name: Ensure Postgres pod is Ready
+      shell: |
+        set -e
+        microk8s kubectl -n {{ ns }} wait --for=condition=Ready pod/postgres-0 --timeout=600s
+      args:
+        executable: /bin/bash
+
+    - name: Create/update ConfigMap ds2025-load-photos-sql from sqlData/load_photos.sql
+      shell: |
+        set -e
+        microk8s kubectl -n {{ ns }} create configmap ds2025-load-photos-sql \
+          --from-file=load_photos.sql={{ load_sql_on_vm }} \
+          --dry-run=client -o yaml | microk8s kubectl apply -f -
+      args:
+        executable: /bin/bash
+
+    - name: Delete previous load-photos job if exists
+      shell: |
+        set -e
+        microk8s kubectl -n {{ ns }} delete job postgres-load-photos --ignore-not-found
+      args:
+        executable: /bin/bash
+
+    - name: Apply load-photos job manifest (16-postgres-load-photos-job.yml)
+      shell: |
+        set -e
+        microk8s kubectl apply -f {{ job_manifest_on_vm }}
+      args:
+        executable: /bin/bash
+
+    - name: Wait for load-photos job completion
+      shell: |
+        set -e
+        microk8s kubectl -n {{ ns }} wait --for=condition=complete job/postgres-load-photos --timeout=900s
+      args:
+        executable: /bin/bash
+
+    - name: Show load-photos job logs
+      shell: |
+        set -e
+        microk8s kubectl -n {{ ns }} logs job/postgres-load-photos --tail=200
+      args:
+        executable: /bin/bash
+      register: job_logs
+      changed_when: false
+
+    - debug:
+        var: job_logs.stdout_lines
+
+    - name: Sanity check property_photos count
+      shell: |
+        set -e
+        microk8s kubectl -n {{ ns }} exec -i postgres-0 -- \
+          psql -U {{ db_user }} -d {{ db_name }} -c "select count(*) as property_photos from property_photos;"
+      args:
+        executable: /bin/bash
+      register: prop_count
+      changed_when: false
+
+    - debug:
+        var: prop_count.stdout_lines
+
+    - name: Sanity check avatars bytes (sample)
+      shell: |
+        set -e
+        microk8s kubectl -n {{ ns }} exec -i postgres-0 -- \
+          psql -U {{ db_user }} -d {{ db_name }} -c "select username, profile_picture_filename, octet_length(profile_picture) as bytes from users order by id limit 10;"
+      args:
+        executable: /bin/bash
+      register: avatars
+      changed_when: false
+
+    - debug:
+        var: avatars.stdout_lines
