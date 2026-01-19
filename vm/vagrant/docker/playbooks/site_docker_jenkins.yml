@@ -1,5 +1,5 @@
 ---
-- name: Deploy DS-2025 stack on dockerhost via docker compose
+- name: Deploy DS-2025 stack on dockerhost via docker compose (pull from GHCR)
   hosts: docker
   become: true
 
@@ -8,8 +8,14 @@
     repo_url: "https://github.com/it2022031/DevOps-2025.git"
     repo_dest: "{{ project_dir }}/DevOps-2025"
     compose_dir: "{{ repo_dest }}/DevOps/Docker"
+
     docker_compose_bin: /usr/local/bin/docker-compose
     docker_compose_url: "https://github.com/docker/compose/releases/download/v2.24.6/docker-compose-linux-x86_64"
+
+    # If GHCR images are private, set these (recommended via extra-vars in Jenkins):
+    # ghcr_username: "it2022031"
+    # ghcr_token: "<TOKEN_WITH_read:packages>"
+    ghcr_registry: "ghcr.io"
 
   tasks:
     - name: Install prerequisites
@@ -22,7 +28,6 @@
         update_cache: yes
         cache_valid_time: 3600
 
-    # Docker engine from Ubuntu repo (simple + works in generic/ubuntu2204)
     - name: Install Docker engine (Ubuntu repo)
       apt:
         name:
@@ -34,13 +39,6 @@
         name: docker
         state: started
         enabled: yes
-
-    - name: Ensure jenkins/vagrant user can run docker (optional, safe)
-      user:
-        name: "{{ ansible_user | default('vagrant') }}"
-        groups: docker
-        append: yes
-      ignore_errors: true
 
     - name: Create project directory
       file:
@@ -54,6 +52,16 @@
         dest: "{{ repo_dest }}"
         version: "main"
         force: yes
+
+    - name: Ensure docker-compose.yml exists
+      stat:
+        path: "{{ compose_dir }}/docker-compose.yml"
+      register: compose_stat
+
+    - name: Fail if docker-compose.yml missing
+      fail:
+        msg: "Missing docker-compose.yml at {{ compose_dir }}/docker-compose.yml"
+      when: not compose_stat.stat.exists
 
     # Detect if "docker compose" (v2 plugin) exists
     - name: Check docker compose v2 availability
@@ -75,20 +83,45 @@
         mode: "0755"
       when: compose_v2_check.rc != 0 and not compose_bin.stat.exists
 
-    # Bring stack up using v2 if present, else v1 binary
-    - name: Docker compose up -d (v2 plugin)
-      command: docker compose up -d --build
+    # Optional: GHCR login (ONLY if credentials provided; for public images it is skipped)
+    - name: GHCR login (if ghcr_username & ghcr_token provided)
+      shell: |
+        set -e
+        echo "{{ ghcr_token }}" | docker login {{ ghcr_registry }} -u "{{ ghcr_username }}" --password-stdin
+      args:
+        executable: /bin/bash
+      when:
+        - ghcr_username is defined
+        - ghcr_token is defined
+        - ghcr_username | length > 0
+        - ghcr_token | length > 0
+
+    # Pull + Up (NO BUILD)
+    - name: Compose pull (v2)
+      command: docker compose pull
       args:
         chdir: "{{ compose_dir }}"
       when: compose_v2_check.rc == 0
 
-    - name: Docker compose up -d (standalone docker-compose)
-      command: "{{ docker_compose_bin }} up -d --build"
+    - name: Compose pull (v1 binary)
+      command: "{{ docker_compose_bin }} pull"
       args:
         chdir: "{{ compose_dir }}"
       when: compose_v2_check.rc != 0
 
-    - name: Show docker compose ps (v2 plugin)
+    - name: Compose up -d (v2) (NO BUILD)
+      command: docker compose up -d
+      args:
+        chdir: "{{ compose_dir }}"
+      when: compose_v2_check.rc == 0
+
+    - name: Compose up -d (v1 binary) (NO BUILD)
+      command: "{{ docker_compose_bin }} up -d"
+      args:
+        chdir: "{{ compose_dir }}"
+      when: compose_v2_check.rc != 0
+
+    - name: Show docker compose ps (v2)
       command: docker compose ps
       args:
         chdir: "{{ compose_dir }}"
@@ -96,7 +129,7 @@
       changed_when: false
       when: compose_v2_check.rc == 0
 
-    - name: Show docker compose ps (standalone docker-compose)
+    - name: Show docker compose ps (v1)
       command: "{{ docker_compose_bin }} ps"
       args:
         chdir: "{{ compose_dir }}"
@@ -107,16 +140,3 @@
     - name: Print docker compose ps
       debug:
         var: (ps_out_v2.stdout_lines if compose_v2_check.rc == 0 else ps_out_v1.stdout_lines)
-
-    # Optional waits (uncomment if you want)
-    # - name: Wait for frontend (published on 8081)
-    #   wait_for:
-    #     host: 127.0.0.1
-    #     port: 8081
-    #     timeout: 120
-    #
-    # - name: Wait for backend (published on 8080)
-    #   wait_for:
-    #     host: 127.0.0.1
-    #     port: 8080
-    #     timeout: 120
