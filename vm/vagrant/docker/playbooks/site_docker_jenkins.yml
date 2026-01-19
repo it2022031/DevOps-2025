@@ -8,6 +8,8 @@
     repo_url: "https://github.com/it2022031/DevOps-2025.git"
     repo_dest: "{{ project_dir }}/DevOps-2025"
     compose_dir: "{{ repo_dest }}/DevOps/Docker"
+    docker_compose_bin: /usr/local/bin/docker-compose
+    docker_compose_url: "https://github.com/docker/compose/releases/download/v2.24.6/docker-compose-linux-x86_64"
 
   tasks:
     - name: Install prerequisites
@@ -20,12 +22,11 @@
         update_cache: yes
         cache_valid_time: 3600
 
-    # Docker engine (Ubuntu repo)
-    - name: Install Docker packages
+    # Docker engine from Ubuntu repo (simple + works in generic/ubuntu2204)
+    - name: Install Docker engine (Ubuntu repo)
       apt:
         name:
           - docker.io
-          - docker-compose-plugin
         state: present
 
     - name: Ensure docker service is running
@@ -33,6 +34,13 @@
         name: docker
         state: started
         enabled: yes
+
+    - name: Ensure jenkins/vagrant user can run docker (optional, safe)
+      user:
+        name: "{{ ansible_user | default('vagrant') }}"
+        groups: docker
+        append: yes
+      ignore_errors: true
 
     - name: Create project directory
       file:
@@ -47,18 +55,68 @@
         version: "main"
         force: yes
 
-    - name: Docker compose up -d
+    # Detect if "docker compose" (v2 plugin) exists
+    - name: Check docker compose v2 availability
+      command: docker compose version
+      register: compose_v2_check
+      changed_when: false
+      failed_when: false
+
+    # If v2 plugin missing, install standalone docker-compose binary
+    - name: Check if standalone docker-compose exists
+      stat:
+        path: "{{ docker_compose_bin }}"
+      register: compose_bin
+
+    - name: Install standalone docker-compose (if v2 missing and binary missing)
+      get_url:
+        url: "{{ docker_compose_url }}"
+        dest: "{{ docker_compose_bin }}"
+        mode: "0755"
+      when: compose_v2_check.rc != 0 and not compose_bin.stat.exists
+
+    # Bring stack up using v2 if present, else v1 binary
+    - name: Docker compose up -d (v2 plugin)
       command: docker compose up -d --build
       args:
         chdir: "{{ compose_dir }}"
+      when: compose_v2_check.rc == 0
 
-    - name: Show docker compose ps
+    - name: Docker compose up -d (standalone docker-compose)
+      command: "{{ docker_compose_bin }} up -d --build"
+      args:
+        chdir: "{{ compose_dir }}"
+      when: compose_v2_check.rc != 0
+
+    - name: Show docker compose ps (v2 plugin)
       command: docker compose ps
       args:
         chdir: "{{ compose_dir }}"
-      register: ps_out
+      register: ps_out_v2
       changed_when: false
+      when: compose_v2_check.rc == 0
+
+    - name: Show docker compose ps (standalone docker-compose)
+      command: "{{ docker_compose_bin }} ps"
+      args:
+        chdir: "{{ compose_dir }}"
+      register: ps_out_v1
+      changed_when: false
+      when: compose_v2_check.rc != 0
 
     - name: Print docker compose ps
       debug:
-        var: ps_out.stdout_lines
+        var: (ps_out_v2.stdout_lines if compose_v2_check.rc == 0 else ps_out_v1.stdout_lines)
+
+    # Optional waits (uncomment if you want)
+    # - name: Wait for frontend (published on 8081)
+    #   wait_for:
+    #     host: 127.0.0.1
+    #     port: 8081
+    #     timeout: 120
+    #
+    # - name: Wait for backend (published on 8080)
+    #   wait_for:
+    #     host: 127.0.0.1
+    #     port: 8080
+    #     timeout: 120
