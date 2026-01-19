@@ -5,9 +5,10 @@ pipeline {
         stage('Ping') {
             steps {
                 sh '''
-          cd vm/vagrant
-          ansible -i hosts_jenkins.ini all -m ping
-        '''
+                  cd vm/vagrant
+                  export ANSIBLE_HOST_KEY_CHECKING=False
+                  ansible -i hosts_jenkins.ini all -m ping
+                '''
             }
         }
     }
