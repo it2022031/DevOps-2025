@@ -1,16 +1,15 @@
 ---
-- name: Seed DB on VMs (run seed SQL from /vagrant/sqlData)
+- name: Seed PostgreSQL on VMs from /vagrant/sqlData/test_dedomena.sql
   hosts: backend
   become: true
 
   vars:
-    db_host: "{{ hostvars['db'].ansible_host | default('10.10.10.12') }}"
+    db_host: "{{ hostvars['db'].ansible_host }}"
     db_port: 5432
     db_name: demo_db
     db_user: demo_user
     db_pass: demo_pass
 
-    # Put this file in: vm/vagrant/sqlData/test_dedomena.sql
     seed_sql_on_vm: /vagrant/sqlData/test_dedomena.sql
 
   tasks:
@@ -27,7 +26,7 @@
 
     - name: Fail if seed SQL missing
       fail:
-        msg: "Missing {{ seed_sql_on_vm }}. Put test_dedomena.sql under vm/vagrant/sqlData/"
+        msg: "Missing {{ seed_sql_on_vm }}. Ensure vm/vagrant/sqlData/test_dedomena.sql exists"
       when: not seed_sql_stat.stat.exists
 
     - name: Wait for DB reachable

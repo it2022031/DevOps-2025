@@ -1,18 +1,13 @@
 ---
-- name: Load photos into DBVM (photos + load_photos.sql from /vagrant)
+- name: Load photos into DBVM from /vagrant/sqlData (photos + load_photos.sql)
   hosts: db
   become: true
 
   vars:
     db_name: demo_db
 
-    # Put photos here on host repo: vm/vagrant/sqlData/photos
-    # so inside VM: /vagrant/sqlData/photos
     photos_src_on_vm: /vagrant/sqlData/photos
-
-    # Put SQL here: vm/vagrant/sqlData/load_photos.sql  -> /vagrant/sqlData/load_photos.sql
     load_sql_on_vm: /vagrant/sqlData/load_photos.sql
-
     load_sql_dbvm: /tmp/load_photos.sql
 
   tasks:
@@ -23,7 +18,7 @@
 
     - name: Fail if photos folder missing
       fail:
-        msg: "Missing photos folder {{ photos_src_on_vm }}. Put photos under vm/vagrant/sqlData/photos/"
+        msg: "Missing {{ photos_src_on_vm }}. Ensure vm/vagrant/sqlData/photos exists"
       when: not photos_stat.stat.exists
 
     - name: Ensure load_photos.sql exists on db VM (synced)
@@ -33,7 +28,7 @@
 
     - name: Fail if load_photos.sql missing
       fail:
-        msg: "Missing {{ load_sql_on_vm }}. Put load_photos.sql under vm/vagrant/sqlData/"
+        msg: "Missing {{ load_sql_on_vm }}. Ensure vm/vagrant/sqlData/load_photos.sql exists"
       when: not load_sql_stat.stat.exists
 
     - name: Ensure /photos exists on dbvm
