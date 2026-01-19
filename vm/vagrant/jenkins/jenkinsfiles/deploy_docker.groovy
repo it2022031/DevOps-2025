@@ -27,22 +27,12 @@ pipeline {
             }
         }
 
-        stage('Install Docker (infra)') {
+        stage('Deploy Docker stack') {
             steps {
                 sh '''
           set -e
           cd vm/vagrant
-          ansible-playbook -i hosts_jenkins.ini playbooks/install_docker.yml
-        '''
-            }
-        }
-
-        stage('Deploy docker-compose stack') {
-            steps {
-                sh '''
-          set -e
-          cd vm/vagrant
-          ansible-playbook -i hosts_jenkins.ini playbooks/docker_site.yml
+          ansible-playbook -i hosts_jenkins.ini docker/playbooks/site_docker_jenkins.yml
         '''
             }
         }
@@ -50,10 +40,10 @@ pipeline {
 
     post {
         success {
-            echo '✅ Docker stack deployed successfully'
+            echo '✅ Docker deployment completed successfully'
         }
         failure {
-            echo '❌ Docker deploy failed – check console output'
+            echo '❌ Docker deployment failed – check logs'
         }
     }
 }

@@ -1,0 +1,64 @@
+---
+- name: Deploy DS-2025 stack on dockerhost via docker compose
+  hosts: docker
+  become: true
+
+  vars:
+    project_dir: /opt/DS-2025
+    repo_url: "https://github.com/it2022031/DevOps-2025.git"
+    repo_dest: "{{ project_dir }}/DevOps-2025"
+    compose_dir: "{{ repo_dest }}/DevOps/Docker"
+
+  tasks:
+    - name: Install prerequisites
+      apt:
+        name:
+          - git
+          - ca-certificates
+          - curl
+        state: present
+        update_cache: yes
+        cache_valid_time: 3600
+
+    # Docker engine (Ubuntu repo)
+    - name: Install Docker packages
+      apt:
+        name:
+          - docker.io
+          - docker-compose-plugin
+        state: present
+
+    - name: Ensure docker service is running
+      service:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Create project directory
+      file:
+        path: "{{ project_dir }}"
+        state: directory
+        mode: "0755"
+
+    - name: Clone or update repository
+      git:
+        repo: "{{ repo_url }}"
+        dest: "{{ repo_dest }}"
+        version: "main"
+        force: yes
+
+    - name: Docker compose up -d
+      command: docker compose up -d --build
+      args:
+        chdir: "{{ compose_dir }}"
+
+    - name: Show docker compose ps
+      command: docker compose ps
+      args:
+        chdir: "{{ compose_dir }}"
+      register: ps_out
+      changed_when: false
+
+    - name: Print docker compose ps
+      debug:
+        var: ps_out.stdout_lines
