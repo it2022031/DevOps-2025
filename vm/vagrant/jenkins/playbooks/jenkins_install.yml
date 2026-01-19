@@ -1,0 +1,73 @@
+---
+- name: Install Jenkins (LTS) with Java 17 on Jenkins VM
+  hosts: jenkins
+  become: true
+
+  tasks:
+    - name: Install base prerequisites + Java 17
+      apt:
+        name:
+          - ca-certificates
+          - curl
+          - gnupg
+          - git
+          - openjdk-17-jdk
+        state: present
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: Create keyrings directory
+      file:
+        path: /etc/apt/keyrings
+        state: directory
+        mode: "0755"
+
+    - name: Add Jenkins repository key (debian-stable)
+      shell: |
+        curl -fsSL https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key \
+          | tee /etc/apt/keyrings/jenkins-keyring.asc >/dev/null
+        chmod 0644 /etc/apt/keyrings/jenkins-keyring.asc
+      args:
+        creates: /etc/apt/keyrings/jenkins-keyring.asc
+
+    - name: Add Jenkins apt repository
+      copy:
+        dest: /etc/apt/sources.list.d/jenkins.list
+        mode: "0644"
+        content: |
+          deb [signed-by=/etc/apt/keyrings/jenkins-keyring.asc] https://pkg.jenkins.io/debian-stable binary/
+      register: jenkins_repo
+
+    - name: apt update (only if repo changed)
+      apt:
+        update_cache: yes
+      when: jenkins_repo.changed
+
+    - name: Install Jenkins
+      apt:
+        name: jenkins
+        state: present
+
+    - name: Enable and start Jenkins service
+      service:
+        name: jenkins
+        state: started
+        enabled: yes
+
+    - name: Wait for Jenkins to respond on localhost:8080
+      uri:
+        url: "http://127.0.0.1:8080/login"
+        status_code: 200
+      register: jenkins_http
+      retries: 60
+      delay: 2
+      until: jenkins_http.status == 200
+
+    - name: Read initial admin password
+      command: cat /var/lib/jenkins/secrets/initialAdminPassword
+      register: admin_pass
+      changed_when: false
+
+    - name: Show initial admin password
+      debug:
+        msg: "Initial Jenkins admin password: {{ admin_pass.stdout }}"
