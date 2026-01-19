@@ -4,6 +4,10 @@
   become: true
 
   vars:
+    project_dir: /opt/DS-2025
+    repo_url: "https://github.com/it2022031/DevOps-2025.git"
+    repo_dest: "{{ project_dir }}/DevOps-2025"
+
     ghcr_user: "it2022031"
     ghcr_token: "{{ ghcr_token }}"
 
