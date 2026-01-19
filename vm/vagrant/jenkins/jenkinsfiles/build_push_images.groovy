@@ -13,7 +13,7 @@ pipeline {
 
         stage('Build & Push images (on dockerhost)') {
             steps {
-                withCredentials([string(credentialsId: 'ghcr-token', variable: 'GHCR_TOKEN')]) {
+                withCredentials([string(credentialsId: 'ghcr_token', variable: 'GHCR_TOKEN')]) {
                     sh '''
             set -e
             cd vm/vagrant
