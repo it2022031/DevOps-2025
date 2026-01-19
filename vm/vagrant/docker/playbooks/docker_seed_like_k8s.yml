@@ -1,15 +1,26 @@
 ---
-- name: Seed DB in Docker (run SQL inside db container from mounted DS-2025 repo)
+- name: Seed DB in Docker from /vagrant/sqlData/test_dedomena.sql (K8s-like)
   hosts: docker
   become: true
 
   vars:
-    compose_dir: "/vagrant/docker"     # σωστό στο dockerhost (όπως ήδη δουλεύεις)
+    compose_dir: "/vagrant/docker"
     db_name: "demo_db"
     db_user: "demo_user"
-    seed_sql_in_container: "/ds2025/backend/demo/src/main/resources/db/migration/test_dedomena.sql"
+    seed_sql_on_dockerhost: "/vagrant/sqlData/test_dedomena.sql"
+    seed_sql_in_container: "/tmp/test_dedomena.sql"
 
   tasks:
+    - name: Ensure seed SQL exists on dockerhost (synced folder)
+      stat:
+        path: "{{ seed_sql_on_dockerhost }}"
+      register: seed_stat
+
+    - name: Fail if seed SQL missing
+      fail:
+        msg: "Missing {{ seed_sql_on_dockerhost }}. Ensure vm/vagrant/sqlData/test_dedomena.sql exists"
+      when: not seed_stat.stat.exists
+
     - name: Bring stack up
       shell: |
         set -e
@@ -33,11 +44,13 @@
       args:
         executable: /bin/bash
 
-    - name: Verify seed SQL exists inside db container
+    - name: Copy seed SQL into db container
       shell: |
         set -e
         cd "{{ compose_dir }}"
-        /usr/local/bin/docker-compose exec -T db sh -lc 'test -f "{{ seed_sql_in_container }}" && echo OK'
+        CID=$(/usr/local/bin/docker-compose ps -q db)
+        test -n "$CID"
+        docker cp "{{ seed_sql_on_dockerhost }}" "${CID}:{{ seed_sql_in_container }}"
       args:
         executable: /bin/bash
 
