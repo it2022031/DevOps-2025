@@ -1,10 +1,11 @@
 pipeline {
     agent any
 
-    ansiColor('xterm')
+    options {
+        timestamps()
+    }
 
     environment {
-        // Για lab/VMs: αποφεύγουμε interactive host key prompts
         ANSIBLE_HOST_KEY_CHECKING = "False"
     }
 
@@ -15,20 +16,7 @@ pipeline {
             }
         }
 
-        stage('Sanity: inventory + ansible version') {
-            steps {
-                sh '''
-          set -e
-          cd vm/vagrant
-          echo "== ansible version =="
-          ansible --version
-          echo "== inventory =="
-          cat hosts_jenkins.ini
-        '''
-            }
-        }
-
-        stage('Ping all targets') {
+        stage('Ping') {
             steps {
                 sh '''
           set -e
@@ -38,12 +26,12 @@ pipeline {
             }
         }
 
-        stage('Deploy VMs (site.yml)') {
+        stage('Deploy VMs (site_jenkins.yml)') {
             steps {
                 sh '''
           set -e
           cd vm/vagrant
-          ansible-playbook -i hosts_jenkins.ini playbooks/site.yml
+          ansible-playbook -i hosts_jenkins.ini playbooks/site_jenkins.yml
         '''
             }
         }
@@ -60,11 +48,7 @@ pipeline {
     }
 
     post {
-        success {
-            echo "✅ VM deploy pipeline finished successfully."
-        }
-        failure {
-            echo "❌ VM deploy pipeline failed. Check Console Output above."
-        }
+        success { echo '✅ Deploy VMs succeeded' }
+        failure { echo '❌ Deploy VMs failed (see Console Output)' }
     }
 }
