@@ -7,10 +7,15 @@ services:
       POSTGRES_PASSWORD: demo_pass
     volumes:
       - pgdata:/var/lib/postgresql/data
+
+      # SQL + photos from synced /vagrant
       - /vagrant/sqlData:/seed:ro
+      - /vagrant/sqlData/photos/avatar_photos:/photos/avatar_photos:ro
+      - "/vagrant/sqlData/photos/property_photos :/photos/property_photos:ro"
+
+      # (προαιρετικά) τα παλιά mounts – μπορείς να τα κρατήσεις ή να τα βγάλεις
       - /opt/DS-2025:/ds2025:ro
       - /opt/DS-2025/photos:/photos_src:ro
-      - /opt/DS-2025:/ds2025:ro
     ports:
       - "5432:5432"
     healthcheck:
