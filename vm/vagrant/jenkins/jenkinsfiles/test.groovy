@@ -6,7 +6,7 @@ pipeline {
             steps {
                 sh '''
           cd vm/vagrant
-          ansible -i hosts.ini all -m ping
+          ansible -i hosts_jenkins.ini all -m ping
         '''
             }
         }
