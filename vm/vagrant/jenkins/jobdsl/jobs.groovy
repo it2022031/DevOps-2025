@@ -34,3 +34,18 @@ pipelineJob('deploy-vms') {
         }
     }
 }
+pipelineJob('deploy-docker') {
+    definition {
+        cpsScm {
+            scm {
+                git {
+                    remote { url(repoUrl) }
+                    branches(branch)
+                }
+            }
+            scriptPath('vm/vagrant/jenkins/jenkinsfiles/deploy_docker.groovy')
+            lightweight(true)
+        }
+    }
+}
+
