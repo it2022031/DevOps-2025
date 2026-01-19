@@ -1,0 +1,91 @@
+---
+- name: Configure SSH for Linux user "jenkins" to reach target VMs
+  hosts: jenkins
+  become: true
+
+  vars:
+    jenkins_home: /var/lib/jenkins
+    ssh_dir: "{{ jenkins_home }}/.ssh"
+    src_key: /home/vagrant/.ssh/jenkins_id
+    src_pub: /home/vagrant/.ssh/jenkins_id.pub
+    dst_key: "{{ ssh_dir }}/jenkins_id"
+    dst_pub: "{{ ssh_dir }}/jenkins_id.pub"
+    dst_cfg: "{{ ssh_dir }}/config"
+
+  tasks:
+    - name: Ensure jenkins .ssh directory exists
+      file:
+        path: "{{ ssh_dir }}"
+        state: directory
+        owner: jenkins
+        group: jenkins
+        mode: "0700"
+
+    - name: Copy private key to jenkins user
+      copy:
+        src: "{{ src_key }}"
+        dest: "{{ dst_key }}"
+        owner: jenkins
+        group: jenkins
+        mode: "0600"
+        remote_src: true
+
+    - name: Copy public key to jenkins user
+      copy:
+        src: "{{ src_pub }}"
+        dest: "{{ dst_pub }}"
+        owner: jenkins
+        group: jenkins
+        mode: "0644"
+        remote_src: true
+
+    - name: Write SSH config for jenkins user (disable host key checking + set aliases)
+      copy:
+        dest: "{{ dst_cfg }}"
+        owner: jenkins
+        group: jenkins
+        mode: "0600"
+        content: |
+          Host *
+            StrictHostKeyChecking no
+            UserKnownHostsFile /dev/null
+
+          Host backend
+            HostName 10.10.10.11
+            User vagrant
+            IdentityFile {{ dst_key }}
+            IdentitiesOnly yes
+
+          Host db
+            HostName 10.10.10.12
+            User vagrant
+            IdentityFile {{ dst_key }}
+            IdentitiesOnly yes
+
+          Host front
+            HostName 10.10.10.13
+            User vagrant
+            IdentityFile {{ dst_key }}
+            IdentitiesOnly yes
+
+          Host dockerhost
+            HostName 10.10.10.14
+            User vagrant
+            IdentityFile {{ dst_key }}
+            IdentitiesOnly yes
+
+          Host k8shost
+            HostName 10.10.10.15
+            User vagrant
+            IdentityFile {{ dst_key }}
+            IdentitiesOnly yes
+
+    - name: Test SSH from jenkins user to backend (non-fatal)
+      become_user: jenkins
+      shell: "ssh backend 'hostname'"
+      register: ssh_test
+      changed_when: false
+
+    - name: Show SSH test output
+      debug:
+        var: ssh_test.stdout
