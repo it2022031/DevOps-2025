@@ -48,4 +48,18 @@ pipelineJob('deploy-docker') {
         }
     }
 }
+pipelineJob('deploy-k8s') {
+    definition {
+        cpsScm {
+            scm {
+                git {
+                    remote { url(repoUrl) }
+                    branches(branch)
+                }
+            }
+            scriptPath('vm/vagrant/jenkins/jenkinsfiles/deploy_k8s.groovy')
+            lightweight(true)
+        }
+    }
+}
 

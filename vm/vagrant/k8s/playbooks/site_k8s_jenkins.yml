@@ -1,0 +1,45 @@
+---
+- name: Apply DS-2025 Kubernetes manifests
+  hosts: k8s
+  become: true
+
+  vars:
+    ns: ds2025
+    manifests_dir: /vagrant/k8s/manifests
+
+    core_files:
+      - 00-namespace.yml
+      - 10-postgres.yml
+      - 20-minio.yml
+      - 30-mailhog.yml
+      - 40-backend.yml
+      - 50-frontend.yml
+      - 60-ingress.yml
+
+  tasks:
+    - name: Apply manifests in order
+      shell: |
+        set -e
+        for f in {{ core_files | join(' ') }}; do
+          echo "== APPLY $f =="
+          microk8s kubectl apply -f "{{ manifests_dir }}/$f"
+        done
+      args:
+        executable: /bin/bash
+
+    - name: Wait for backend ready
+      shell: microk8s kubectl -n {{ ns }} wait --for=condition=Ready pod -l app=backend --timeout=600s
+
+    - name: Wait for frontend ready
+      shell: microk8s kubectl -n {{ ns }} wait --for=condition=Ready pod -l app=frontend --timeout=600s
+
+    - name: Show cluster status
+      shell: |
+        microk8s kubectl -n {{ ns }} get pods
+        microk8s kubectl -n {{ ns }} get svc
+        microk8s kubectl -n {{ ns }} get ingress
+      register: status
+      changed_when: false
+
+    - debug:
+        var: status.stdout_lines
