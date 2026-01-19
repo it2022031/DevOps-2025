@@ -14,7 +14,7 @@
     backend_image: "ghcr.io/it2022031/ds2025-backend:latest"
     frontend_image: "ghcr.io/it2022031/ds2025-frontend:latest"
 
-    build_context: "{{ repo_dest }}/vm/vagrant"
+    build_context: "{{ repo_dest }}/vm/vagrant/docker"
     docker_dir: "{{ build_context }}/docker"
     repo_url_app: "https://github.com/it2022031/DS-2025.git"
     repo_branch_app: "main-branch"
@@ -47,7 +47,7 @@
       command: >
         docker build
         -t {{ backend_image }}
-        -f docker/dockerfiles/backend.Dockerfile
+        -f dockerfiles/backend.Dockerfile
         --build-arg REPO_URL={{ repo_url_app }}
         --build-arg REPO_BRANCH={{ repo_branch_app }}
         .
@@ -61,7 +61,7 @@
       command: >
         docker build
         -t {{ frontend_image }}
-        -f docker/dockerfiles/frontend.Dockerfile
+        -f dockerfiles/frontend.Dockerfile
         --build-arg REPO_URL={{ repo_url_app }}
         --build-arg REPO_BRANCH={{ repo_branch_app }}
         .
