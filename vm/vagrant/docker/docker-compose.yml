@@ -7,6 +7,7 @@ services:
       POSTGRES_PASSWORD: demo_pass
     volumes:
       - pgdata:/var/lib/postgresql/data
+      - /vagrant/sqlData:/seed:ro
       - /opt/DS-2025:/ds2025:ro
       - /opt/DS-2025/photos:/photos_src:ro
       - /opt/DS-2025:/ds2025:ro

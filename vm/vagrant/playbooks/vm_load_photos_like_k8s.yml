@@ -1,73 +1,48 @@
 ---
-- name: Load photos into DBVM from /vagrant/sqlData (photos + load_photos.sql)
+- name: Load photos on DB VM using /vagrant/sqlData (no copy, k8s-like)
   hosts: db
   become: true
 
   vars:
     db_name: demo_db
-
-    photos_src_on_vm: /vagrant/sqlData/photos
-    load_sql_on_vm: /vagrant/sqlData/load_photos.sql
-    load_sql_dbvm: /tmp/load_photos.sql
+    load_sql: /vagrant/sqlData/load_photos.sql
+    photos_dir: /vagrant/sqlData/photos
 
   tasks:
-    - name: Ensure photos folder exists on db VM (synced)
+    - name: Ensure load_photos.sql exists (synced)
       stat:
-        path: "{{ photos_src_on_vm }}"
-      register: photos_stat
-
-    - name: Fail if photos folder missing
-      fail:
-        msg: "Missing {{ photos_src_on_vm }}. Ensure vm/vagrant/sqlData/photos exists"
-      when: not photos_stat.stat.exists
-
-    - name: Ensure load_photos.sql exists on db VM (synced)
-      stat:
-        path: "{{ load_sql_on_vm }}"
-      register: load_sql_stat
+        path: "{{ load_sql }}"
+      register: s1
 
     - name: Fail if load_photos.sql missing
       fail:
-        msg: "Missing {{ load_sql_on_vm }}. Ensure vm/vagrant/sqlData/load_photos.sql exists"
-      when: not load_sql_stat.stat.exists
+        msg: "Missing {{ load_sql }} (expected in vm/vagrant/sqlData/load_photos.sql)"
+      when: not s1.stat.exists
 
-    - name: Ensure /photos exists on dbvm
-      file:
-        path: /photos
-        state: directory
-        mode: "0755"
+    - name: Ensure photos dir exists (synced)
+      stat:
+        path: "{{ photos_dir }}"
+      register: s2
 
-    - name: Copy avatar_photos to dbvm:/photos/avatar_photos
-      copy:
-        src: "{{ photos_src_on_vm }}/avatar_photos/"
-        dest: /photos/avatar_photos/
-        mode: "0644"
+    - name: Fail if photos dir missing
+      fail:
+        msg: "Missing {{ photos_dir }} (expected in vm/vagrant/sqlData/photos/)"
+      when: not s2.stat.exists
 
-    - name: Copy property_photos to dbvm:/photos/property_photos_tmp
-      copy:
-        src: "{{ photos_src_on_vm }}/property_photos/"
-        dest: /photos/property_photos_tmp/
-        mode: "0644"
-
-    - name: Normalize property photos folder name on dbvm
+    - name: Create stable symlinks for SQL paths
       shell: |
         set -e
-        rm -rf /photos/property_photos
-        mv /photos/property_photos_tmp /photos/property_photos
-        ls -la /photos
+        rm -rf /photos_src /photos
+        ln -s "{{ photos_dir }}" /photos_src
+        ln -s "{{ photos_dir }}" /photos
+        ls -la /photos_src || true
       args:
         executable: /bin/bash
 
-    - name: Copy load_photos.sql to dbvm:/tmp/load_photos.sql
-      copy:
-        src: "{{ load_sql_on_vm }}"
-        dest: "{{ load_sql_dbvm }}"
-        mode: "0644"
-
-    - name: Run load_photos.sql on dbvm as postgres
+    - name: Run load_photos.sql as postgres
       shell: |
         set -euo pipefail
-        sudo -u postgres psql -d "{{ db_name }}" -v ON_ERROR_STOP=1 -f "{{ load_sql_dbvm }}"
+        sudo -u postgres psql -d "{{ db_name }}" -v ON_ERROR_STOP=1 -f "{{ load_sql }}"
       args:
         executable: /bin/bash
 
@@ -82,17 +57,3 @@
 
     - debug:
         var: prop_count.stdout_lines
-
-    - name: Sanity check avatars bytes (sample)
-      shell: |
-        set -e
-        sudo -u postgres psql -d "{{ db_name }}" -c \
-        "select username, profile_picture_filename, octet_length(profile_picture) as bytes
-         from users order by id limit 10;"
-      args:
-        executable: /bin/bash
-      register: avatars
-      changed_when: false
-
-    - debug:
-        var: avatars.stdout_lines

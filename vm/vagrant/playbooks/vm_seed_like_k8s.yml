@@ -9,8 +9,7 @@
     db_name: demo_db
     db_user: demo_user
     db_pass: demo_pass
-
-    seed_sql_on_vm: /vagrant/sqlData/test_dedomena.sql
+    seed_sql: /vagrant/sqlData/test_dedomena.sql
 
   tasks:
     - name: Ensure psql client exists on backend
@@ -19,15 +18,15 @@
         state: present
         update_cache: yes
 
-    - name: Ensure seed SQL exists on backend (synced folder)
+    - name: Ensure seed SQL exists on backend (synced)
       stat:
-        path: "{{ seed_sql_on_vm }}"
-      register: seed_sql_stat
+        path: "{{ seed_sql }}"
+      register: s
 
     - name: Fail if seed SQL missing
       fail:
-        msg: "Missing {{ seed_sql_on_vm }}. Ensure vm/vagrant/sqlData/test_dedomena.sql exists"
-      when: not seed_sql_stat.stat.exists
+        msg: "Missing {{ seed_sql }} (expected in vm/vagrant/sqlData/test_dedomena.sql)"
+      when: not s.stat.exists
 
     - name: Wait for DB reachable
       wait_for:
@@ -39,22 +38,6 @@
       shell: |
         set -euo pipefail
         export PGPASSWORD='{{ db_pass }}'
-        psql -v ON_ERROR_STOP=1 -h '{{ db_host }}' -p '{{ db_port }}' -U '{{ db_user }}' -d '{{ db_name }}' -f '{{ seed_sql_on_vm }}'
+        psql -v ON_ERROR_STOP=1 -h '{{ db_host }}' -p '{{ db_port }}' -U '{{ db_user }}' -d '{{ db_name }}' -f '{{ seed_sql }}'
       args:
         executable: /bin/bash
-
-    - name: Sanity check counts (users/properties)
-      shell: |
-        set -euo pipefail
-        export PGPASSWORD='{{ db_pass }}'
-        psql -h '{{ db_host }}' -p '{{ db_port }}' -U '{{ db_user }}' -d '{{ db_name }}' -c \
-        "select 'users' as t, count(*) from users
-         union all
-         select 'properties' as t, count(*) from properties;"
-      args:
-        executable: /bin/bash
-      register: sanity
-      changed_when: false
-
-    - debug:
-        var: sanity.stdout_lines
