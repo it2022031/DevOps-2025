@@ -81,4 +81,12 @@ pipelineJob('build-push-frontend') {
         }
     }
 }
-
+pipelineJob('build-push-images') {
+    definition {
+        cpsScm {
+            scm { git { remote { url(repoUrl) }; branches(branch) } }
+            scriptPath('vm/vagrant/jenkins/jenkinsfiles/build_push_images.groovy')
+            lightweight(true)
+        }
+    }
+}

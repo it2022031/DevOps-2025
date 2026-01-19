@@ -1,0 +1,58 @@
+---
+- name: Build & push DS-2025 images on dockerhost to GHCR
+  hosts: docker
+  become: true
+
+  vars:
+    project_dir: /opt/DS-2025
+    repo_url: "https://github.com/it2022031/DevOps-2025.git"
+    repo_dest: "{{ project_dir }}/DevOps-2025"
+
+    ghcr_user: "it2022031"
+    ghcr_token: "{{ ghcr_token }}"
+
+    backend_image: "ghcr.io/it2022031/ds2025-backend:latest"
+    frontend_image: "ghcr.io/it2022031/ds2025-frontend:latest"
+
+    build_context: "{{ repo_dest }}/vm/vagrant"
+    docker_dir: "{{ build_context }}/docker"
+
+  tasks:
+    - name: Ensure Docker is installed
+      apt:
+        name: docker.io
+        state: present
+        update_cache: yes
+
+    - name: Ensure docker service is running
+      service:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Clone or update repo
+      git:
+        repo: "{{ repo_url }}"
+        dest: "{{ repo_dest }}"
+        version: main
+        force: yes
+
+    - name: Docker login to GHCR
+      shell: echo "{{ ghcr_token }}" | docker login ghcr.io -u "{{ ghcr_user }}" --password-stdin
+      no_log: true
+
+    - name: Build backend image
+      command: docker build -t "{{ backend_image }}" -f docker/dockerfiles/backend.Dockerfile .
+      args:
+        chdir: "{{ build_context }}"
+
+    - name: Push backend image
+      command: docker push "{{ backend_image }}"
+
+    - name: Build frontend image
+      command: docker build -t "{{ frontend_image }}" -f docker/dockerfiles/frontend.Dockerfile .
+      args:
+        chdir: "{{ build_context }}"
+
+    - name: Push frontend image
+      command: docker push "{{ frontend_image }}"
