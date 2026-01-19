@@ -1,10 +1,7 @@
 pipeline {
     agent any
 
-    options {
-        timestamps()
-        ansiColor('xterm')
-    }
+    ansiColor('xterm')
 
     environment {
         // Για lab/VMs: αποφεύγουμε interactive host key prompts
