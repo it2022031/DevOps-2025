@@ -62,4 +62,23 @@ pipelineJob('deploy-k8s') {
         }
     }
 }
+pipelineJob('build-push-backend') {
+    definition {
+        cpsScm {
+            scm { git { remote { url(repoUrl) }; branches(branch) } }
+            scriptPath('vm/vagrant/jenkins/jenkinsfiles/build_push_backend.groovy')
+            lightweight(true)
+        }
+    }
+}
+
+pipelineJob('build-push-frontend') {
+    definition {
+        cpsScm {
+            scm { git { remote { url(repoUrl) }; branches(branch) } }
+            scriptPath('vm/vagrant/jenkins/jenkinsfiles/build_push_frontend.groovy')
+            lightweight(true)
+        }
+    }
+}
 

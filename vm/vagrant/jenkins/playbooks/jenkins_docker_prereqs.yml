@@ -1,0 +1,43 @@
+---
+- name: Ensure Docker is installed and usable by Jenkins user
+  hosts: jenkins
+  become: true
+
+  tasks:
+    - name: Install required packages (Docker + basics)
+      apt:
+        name:
+          - docker.io
+          - ca-certificates
+          - curl
+          - git
+        state: present
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: Ensure docker service is running
+      service:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Add jenkins user to docker group
+      user:
+        name: jenkins
+        groups: docker
+        append: yes
+
+    - name: Restart Jenkins to refresh group membership (important)
+      service:
+        name: jenkins
+        state: restarted
+
+    - name: Verify docker works as jenkins user
+      become_user: jenkins
+      command: docker ps
+      register: docker_ps
+      changed_when: false
+
+    - name: Show docker ps output (as jenkins)
+      debug:
+        var: docker_ps.stdout_lines
