@@ -7,7 +7,7 @@
     project_dir: /opt/DS-2025
     repo_url: "https://github.com/it2022031/DevOps-2025.git"
     repo_dest: "{{ project_dir }}/DevOps-2025"
-    compose_dir: "{{ repo_dest }}/DevOps/Docker"
+    compose_dir: "{{ repo_dest }}/vm/vagrant/docker"
 
     docker_compose_bin: /usr/local/bin/docker-compose
     docker_compose_url: "https://github.com/docker/compose/releases/download/v2.24.6/docker-compose-linux-x86_64"
