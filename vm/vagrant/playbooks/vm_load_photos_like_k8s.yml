@@ -1,0 +1,103 @@
+---
+- name: Load photos into DBVM (photos + load_photos.sql from /vagrant)
+  hosts: db
+  become: true
+
+  vars:
+    db_name: demo_db
+
+    # Put photos here on host repo: vm/vagrant/sqlData/photos
+    # so inside VM: /vagrant/sqlData/photos
+    photos_src_on_vm: /vagrant/sqlData/photos
+
+    # Put SQL here: vm/vagrant/sqlData/load_photos.sql  -> /vagrant/sqlData/load_photos.sql
+    load_sql_on_vm: /vagrant/sqlData/load_photos.sql
+
+    load_sql_dbvm: /tmp/load_photos.sql
+
+  tasks:
+    - name: Ensure photos folder exists on db VM (synced)
+      stat:
+        path: "{{ photos_src_on_vm }}"
+      register: photos_stat
+
+    - name: Fail if photos folder missing
+      fail:
+        msg: "Missing photos folder {{ photos_src_on_vm }}. Put photos under vm/vagrant/sqlData/photos/"
+      when: not photos_stat.stat.exists
+
+    - name: Ensure load_photos.sql exists on db VM (synced)
+      stat:
+        path: "{{ load_sql_on_vm }}"
+      register: load_sql_stat
+
+    - name: Fail if load_photos.sql missing
+      fail:
+        msg: "Missing {{ load_sql_on_vm }}. Put load_photos.sql under vm/vagrant/sqlData/"
+      when: not load_sql_stat.stat.exists
+
+    - name: Ensure /photos exists on dbvm
+      file:
+        path: /photos
+        state: directory
+        mode: "0755"
+
+    - name: Copy avatar_photos to dbvm:/photos/avatar_photos
+      copy:
+        src: "{{ photos_src_on_vm }}/avatar_photos/"
+        dest: /photos/avatar_photos/
+        mode: "0644"
+
+    - name: Copy property_photos to dbvm:/photos/property_photos_tmp
+      copy:
+        src: "{{ photos_src_on_vm }}/property_photos/"
+        dest: /photos/property_photos_tmp/
+        mode: "0644"
+
+    - name: Normalize property photos folder name on dbvm
+      shell: |
+        set -e
+        rm -rf /photos/property_photos
+        mv /photos/property_photos_tmp /photos/property_photos
+        ls -la /photos
+      args:
+        executable: /bin/bash
+
+    - name: Copy load_photos.sql to dbvm:/tmp/load_photos.sql
+      copy:
+        src: "{{ load_sql_on_vm }}"
+        dest: "{{ load_sql_dbvm }}"
+        mode: "0644"
+
+    - name: Run load_photos.sql on dbvm as postgres
+      shell: |
+        set -euo pipefail
+        sudo -u postgres psql -d "{{ db_name }}" -v ON_ERROR_STOP=1 -f "{{ load_sql_dbvm }}"
+      args:
+        executable: /bin/bash
+
+    - name: Sanity check property_photos count
+      shell: |
+        set -e
+        sudo -u postgres psql -d "{{ db_name }}" -c "select count(*) as property_photos from property_photos;"
+      args:
+        executable: /bin/bash
+      register: prop_count
+      changed_when: false
+
+    - debug:
+        var: prop_count.stdout_lines
+
+    - name: Sanity check avatars bytes (sample)
+      shell: |
+        set -e
+        sudo -u postgres psql -d "{{ db_name }}" -c \
+        "select username, profile_picture_filename, octet_length(profile_picture) as bytes
+         from users order by id limit 10;"
+      args:
+        executable: /bin/bash
+      register: avatars
+      changed_when: false
+
+    - debug:
+        var: avatars.stdout_lines

@@ -11,7 +11,7 @@ pipeline {
                 sh '''
           set -e
           cd vm/vagrant
-          ansible-playbook -i hosts_jenkins.ini docker/playbooks/docker_seed.yml
+          ansible-playbook -i hosts_jenkins.ini docker/playbooks/docker_seed_like_k8s.yml
         '''
             }
         }
@@ -21,14 +21,14 @@ pipeline {
                 sh '''
           set -e
           cd vm/vagrant
-          ansible-playbook -i hosts_jenkins.ini docker/playbooks/docker_load_photos.yml
+          ansible-playbook -i hosts_jenkins.ini docker/playbooks/docker_load_photos_like_k8s.yml
         '''
             }
         }
     }
 
     post {
-        success { echo '✅ Docker seed + photos OK' }
-        failure { echo '❌ Docker seed/photos failed' }
+        success { echo '✅ seed-docker: OK' }
+        failure { echo '❌ seed-docker: FAILED' }
     }
 }

@@ -6,29 +6,29 @@ pipeline {
     stages {
         stage('Checkout') { steps { checkout scm } }
 
-        stage('Seed DB (VMs)') {
+        stage('Seed DB (Docker)') {
             steps {
                 sh '''
           set -e
           cd vm/vagrant
-          ansible-playbook -i hosts_jenkins.ini playbooks/seed_db.yml
+          ansible-playbook -i hosts_jenkins.ini docker/playbooks/docker_seed_like_k8s.yml
         '''
             }
         }
 
-        stage('Load Photos (VMs)') {
+        stage('Load Photos (Docker)') {
             steps {
                 sh '''
           set -e
           cd vm/vagrant
-          ansible-playbook -i hosts_jenkins.ini playbooks/load_photos_dbvm.yml
+          ansible-playbook -i hosts_jenkins.ini docker/playbooks/docker_load_photos_like_k8s.yml
         '''
             }
         }
     }
 
     post {
-        success { echo '✅ VMs seed + photos OK' }
-        failure { echo '❌ VMs seed/photos failed' }
+        success { echo '✅ seed-docker: OK' }
+        failure { echo '❌ seed-docker: FAILED' }
     }
 }

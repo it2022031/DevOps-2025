@@ -28,7 +28,7 @@ pipeline {
     }
 
     post {
-        success { echo '✅ K8s seed + photos OK' }
-        failure { echo '❌ K8s seed/photos failed' }
+        success { echo '✅ seed-k8s: OK' }
+        failure { echo '❌ seed-k8s: FAILED' }
     }
 }
