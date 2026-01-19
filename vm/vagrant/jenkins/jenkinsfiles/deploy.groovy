@@ -1,6 +1,14 @@
 pipeline {
     agent any
 
+    options {
+        timestamps()
+    }
+
+    environment {
+        ANSIBLE_HOST_KEY_CHECKING = "False"
+    }
+
     stages {
         stage('Checkout') {
             steps {
@@ -8,31 +16,29 @@ pipeline {
             }
         }
 
-        stage('Ansible Ping') {
+        stage('Ping') {
             steps {
                 sh '''
-                cd vm/vagrant
-                ansible -i hosts.ini all -m ping
-                '''
+          set -e
+          cd vm/vagrant
+          ansible -i hosts_jenkins.ini all -m ping
+        '''
             }
         }
 
-        stage('Deploy All') {
+        stage('Deploy VMs (site_jenkins.yml)') {
             steps {
                 sh '''
-                cd vm/vagrant
-                ansible-playbook -i hosts.ini playbooks/site.yml
-                '''
+          set -e
+          cd vm/vagrant
+          ansible-playbook -i hosts_jenkins.ini playbooks/site_jenkins.yml
+        '''
             }
         }
     }
 
     post {
-        success {
-            echo '✅ Deployment completed'
-        }
-        failure {
-            echo '❌ Deployment failed'
-        }
+        success { echo '✅ Deploy VMs succeeded' }
+        failure { echo '❌ Deploy VMs failed (see Console Output)' }
     }
 }

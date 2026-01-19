@@ -1,0 +1,102 @@
+---
+# Jenkins-safe VM deployment
+# Runs fully from Jenkins VM using hosts_jenkins.ini
+
+# 1) Common prep on all VMs (backend/db/front)
+- name: Common prep on all VMs
+  hosts: vms
+  become: true
+  tasks:
+    - name: Ensure remote tmp dir exists
+      file:
+        path: "/tmp/.ansible-{{ lookup('env','USER') | default('ansible') }}"
+        state: directory
+        mode: "1777"
+
+# 2) Database
+- import_playbook: postgres.yml
+
+# 3) Supporting services on backend
+- import_playbook: minio.yml
+- import_playbook: mailhog.yml
+
+# 4) Backend prerequisites + code
+- import_playbook: java21.yml
+- import_playbook: maven.yml
+
+- import_playbook: clone_ds2025.yml
+  vars:
+    target_hosts: backend
+
+# 5) Backend runtime
+- import_playbook: backend_env.yml
+- import_playbook: build_backend.yml
+- import_playbook: backend_service.yml
+
+# 6) Backend Nginx (proxy :80 -> :8080)
+- import_playbook: nginx_install.yml
+  vars:
+    target_hosts: backend
+
+- import_playbook: nginx_site.yml
+  vars:
+    target_hosts: backend
+    nginx_site: ds2025
+    upstream_host: 127.0.0.1
+    upstream_port: 8080
+    enable_api_proxy: false
+
+- import_playbook: nginx_enable_site.yml
+  vars:
+    target_hosts: backend
+    nginx_site: ds2025
+
+- import_playbook: nginx_restart.yml
+  vars:
+    target_hosts: backend
+
+# 7) Frontend prerequisites + code
+- import_playbook: nvm_install.yml
+- import_playbook: nvm_verify.yml
+
+- import_playbook: clone_ds2025.yml
+  vars:
+    target_hosts: front
+
+# 8) Frontend env + build + service (serve dist on :8081)
+- import_playbook: frontend_env.yml
+- import_playbook: frontend_strip_localhost.yml
+- import_playbook: frontend_build.yml
+- import_playbook: frontend_service.yml
+
+# 9) Front Nginx (proxy :80 -> :8081, and /api -> backend:8080)
+- import_playbook: nginx_install.yml
+  vars:
+    target_hosts: front
+
+- import_playbook: nginx_site.yml
+  vars:
+    target_hosts: front
+    nginx_site: ds2025-front
+    upstream_host: 127.0.0.1
+    upstream_port: 8081
+    enable_api_proxy: true
+    api_prefix: "/api/"
+    api_upstream_host: 10.10.10.11
+    api_upstream_port: 8080
+
+- import_playbook: nginx_enable_site.yml
+  vars:
+    target_hosts: front
+    nginx_site: ds2025-front
+
+- import_playbook: nginx_restart.yml
+  vars:
+    target_hosts: front
+
+# 10) Optional one-time data (uncomment if needed)
+# - import_playbook: seed_db.yml
+# - import_playbook: load_photos_dbvm.yml
+
+# 11) Healthchecks
+- import_playbook: healthcheck.yml
