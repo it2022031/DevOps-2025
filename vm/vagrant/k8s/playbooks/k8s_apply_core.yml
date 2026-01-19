@@ -5,7 +5,7 @@
 
   vars:
     ns: ds2025
-    manifests_dir: "{{ playbook_dir }}/../manifests"
+    manifests_dir: /vagrant/vm/vagrant/k8s/manifests
 
     core_files:
       - 00-namespace.yml
