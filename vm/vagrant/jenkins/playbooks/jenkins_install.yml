@@ -1,17 +1,17 @@
 ---
-- name: Install Jenkins (LTS) with Java 17 on Jenkins VM
+- name: Install Jenkins (LTS) with Java 21 on Jenkins VM
   hosts: jenkins
   become: true
 
   tasks:
-    - name: Install base prerequisites + Java 17
+    - name: Install base prerequisites + Java 21
       apt:
         name:
           - ca-certificates
           - curl
           - gnupg
           - git
-          - openjdk-17-jdk
+          - openjdk-21-jdk
         state: present
         update_cache: yes
         cache_valid_time: 3600

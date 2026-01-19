@@ -1,0 +1,65 @@
+---
+- name: Create or update Jenkins pipeline job (test-pipeline)
+  hosts: jenkins
+  become: false
+
+  vars:
+    # Μέσα στο jenkins VM ο Jenkins ακούει στο 8080
+    jenkins_url: "http://127.0.0.1:8080"
+    jenkins_user: "admin"
+    jenkins_token: "PUT_YOUR_API_TOKEN_HERE"
+    job_name: "test-pipeline"
+    job_xml_path: "/home/vagrant/DevOps-2025/vm/vagrant/jenkins/jobs/test-pipeline.xml"
+
+  tasks:
+    - name: Ensure repo exists on Jenkins VM (so it can read the XML file path)
+      stat:
+        path: "/home/vagrant/DevOps-2025"
+      register: repo_dir
+
+    - name: Fail if repo not found on Jenkins VM
+      fail:
+        msg: "Repo /home/vagrant/DevOps-2025 not found on Jenkins VM. Clone it there or change job_xml_path."
+      when: not repo_dir.stat.exists
+
+    - name: Read job config.xml
+      slurp:
+        src: "{{ job_xml_path }}"
+      register: job_xml
+
+    - name: Get Jenkins crumb
+      uri:
+        url: "{{ jenkins_url }}/crumbIssuer/api/json"
+        method: GET
+        user: "{{ jenkins_user }}"
+        password: "{{ jenkins_token }}"
+        force_basic_auth: true
+        return_content: true
+      register: crumb
+
+    - name: Create job if missing (POST /createItem)
+      uri:
+        url: "{{ jenkins_url }}/createItem?name={{ job_name }}"
+        method: POST
+        user: "{{ jenkins_user }}"
+        password: "{{ jenkins_token }}"
+        force_basic_auth: true
+        headers:
+          Jenkins-Crumb: "{{ (crumb.json.crumb) }}"
+          Content-Type: "application/xml"
+        body: "{{ job_xml.content | b64decode }}"
+        status_code: [200, 201, 302, 400]   # 400 αν υπάρχει ήδη
+      register: create_result
+
+    - name: Update job config (POST /job/<name>/config.xml)
+      uri:
+        url: "{{ jenkins_url }}/job/{{ job_name }}/config.xml"
+        method: POST
+        user: "{{ jenkins_user }}"
+        password: "{{ jenkins_token }}"
+        force_basic_auth: true
+        headers:
+          Jenkins-Crumb: "{{ (crumb.json.crumb) }}"
+          Content-Type: "application/xml"
+        body: "{{ job_xml.content | b64decode }}"
+        status_code: [200, 201]
