@@ -4,10 +4,6 @@
   become: true
 
   vars:
-    project_dir: /opt/DS-2025
-    repo_url: "https://github.com/it2022031/DevOps-2025.git"
-    repo_dest: "{{ project_dir }}/DevOps-2025"
-
     ghcr_user: "it2022031"
     ghcr_token: "{{ ghcr_token }}"
 
@@ -16,6 +12,8 @@
 
     build_context: "{{ repo_dest }}/vm/vagrant"
     docker_dir: "{{ build_context }}/docker"
+    repo_url_app: "https://github.com/it2022031/DS-2025.git"
+    repo_branch_app: "main-branch"
 
   tasks:
     - name: Ensure Docker is installed
@@ -42,7 +40,13 @@
       no_log: true
 
     - name: Build backend image
-      command: docker build -t "{{ backend_image }}" -f docker/dockerfiles/backend.Dockerfile .
+      command: >
+        docker build
+        -t {{ backend_image }}
+        -f docker/dockerfiles/backend.Dockerfile
+        --build-arg REPO_URL={{ repo_url_app }}
+        --build-arg REPO_BRANCH={{ repo_branch_app }}
+        .
       args:
         chdir: "{{ build_context }}"
 
@@ -50,7 +54,13 @@
       command: docker push "{{ backend_image }}"
 
     - name: Build frontend image
-      command: docker build -t "{{ frontend_image }}" -f docker/dockerfiles/frontend.Dockerfile .
+      command: >
+        docker build
+        -t {{ frontend_image }}
+        -f docker/dockerfiles/frontend.Dockerfile
+        --build-arg REPO_URL={{ repo_url_app }}
+        --build-arg REPO_BRANCH={{ repo_branch_app }}
+        .
       args:
         chdir: "{{ build_context }}"
 
