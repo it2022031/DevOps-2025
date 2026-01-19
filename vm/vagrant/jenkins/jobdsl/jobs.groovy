@@ -90,3 +90,33 @@ pipelineJob('build-push-images') {
         }
     }
 }
+pipelineJob('seed-vms') {
+    definition {
+        cpsScm {
+            scm { git { remote { url(repoUrl) }; branches(branch) } }
+            scriptPath('vm/vagrant/jenkins/jenkinsfiles/seed_vms.groovy')
+            lightweight(true)
+        }
+    }
+}
+
+pipelineJob('seed-docker') {
+    definition {
+        cpsScm {
+            scm { git { remote { url(repoUrl) }; branches(branch) } }
+            scriptPath('vm/vagrant/jenkins/jenkinsfiles/seed_docker.groovy')
+            lightweight(true)
+        }
+    }
+}
+
+pipelineJob('seed-k8s') {
+    definition {
+        cpsScm {
+            scm { git { remote { url(repoUrl) }; branches(branch) } }
+            scriptPath('vm/vagrant/jenkins/jenkinsfiles/seed_k8s.groovy')
+            lightweight(true)
+        }
+    }
+}
+
