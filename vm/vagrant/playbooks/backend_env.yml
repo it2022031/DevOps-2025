@@ -7,7 +7,7 @@
     env_dir: /opt/DS-2025/backend
     env_file: /opt/DS-2025/backend/app.env
 
-    db_host: "{{ hostvars['dbvm'].ip }}"
+    db_host: "{{ hostvars['db'].ansible_host }}"
     db_port: 5432
     db_name: demo_db
     db_user: demo_user
