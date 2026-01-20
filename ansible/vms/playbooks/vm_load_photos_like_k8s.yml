@@ -17,7 +17,7 @@
 
     - name: Fail if load_photos.sql missing
       fail:
-        msg: "Missing {{ load_sql }} (expected vm/vagrant/data/sqlData/load_photos.sql)"
+        msg: "Missing {{ load_sql }} (expected /vagrant/data/sqlData/load_photos.sql)"
       when: not s1.stat.exists
 
     - name: Ensure photos dir exists (synced)
@@ -27,7 +27,7 @@
 
     - name: Fail if photos dir missing
       fail:
-        msg: "Missing {{ photos_dir }} (expected vm/vagrant/data/sqlData/photos/)"
+        msg: "Missing {{ photos_dir }} (expected /vagrant/data/sqlData/photos/)"
       when: not s2.stat.exists
 
     - name: Prepare /photos as stable path expected by SQL

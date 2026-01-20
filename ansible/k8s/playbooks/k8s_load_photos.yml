@@ -20,7 +20,7 @@
 
     - name: Fail if load_photos.sql missing
       fail:
-        msg: "Missing {{ load_sql_on_vm }}. Put load_photos.sql under vm/vagrant/data/sqlData/"
+        msg: "Missing {{ load_sql_on_vm }}. Put load_photos.sql under /vagrant/data/sqlData/"
       when: not sql_stat.stat.exists
 
     - name: Ensure Postgres pod is Ready

@@ -16,7 +16,7 @@
 
     - name: Fail if seed SQL missing
       fail:
-        msg: "Missing {{ seed_sql_on_vm }}. Put test_dedomena.sql under vm/vagrant/data/sqlData/"
+        msg: "Missing {{ seed_sql_on_vm }}. Put test_dedomena.sql under /vagrant/data/sqlData/"
       when: not sql_stat.stat.exists
 
     - name: Create/update ConfigMap ds2025-seed-sql from sqlData/test_dedomena.sql

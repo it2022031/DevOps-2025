@@ -2,22 +2,26 @@
 set -euo pipefail
 
 ROOT="$(git rev-parse --show-toplevel)"
+
 VAGRANT_DIR="$ROOT/infra/vagrant"
+INV="$ROOT/infra/inventories/hosts.ini"
+SSHCFG="$ROOT/infra/ssh/ssh.config"
+
+SEED="$ROOT/ansible/docker/playbooks/docker_seed_like_k8s.yml"
+LOAD="$ROOT/ansible/docker/playbooks/docker_load_photos_like_k8s.yml"
+
+mkdir -p "$ROOT/infra/ssh"
+
 cd "$VAGRANT_DIR"
 
-export ANSIBLE_CONFIG="$VAGRANT_DIR/ansible-host.cfg"
+# Ensure dockerhost up
+vagrant up dockerhost >/dev/null
 
-# Ensure dockerhost VM is up
-state="$(vagrant status dockerhost --machine-readable | awk -F, '$3=="state" {print $4}' | tail -n1 || true)"
-if [ "$state" != "running" ]; then
-  echo "🔧 Bringing up: dockerhost"
-  vagrant up dockerhost
-fi
+# Generate SSH config
+vagrant ssh-config dockerhost > "$SSHCFG"
 
-# Refresh infra/ssh/ssh.config so Ansible can reach dockerhost
-vagrant ssh-config dockerhost > infra/ssh/ssh.config
+cd "$ROOT"
 
-# Seed + load photos (k8s-like) on dockerhost
-ansible -i infra/inventories/hosts.ini docker_nodes -m ping
-ansible-playbook docker/ansible/vms/playbooks/docker_seed_like_k8s.yml --limit docker_nodes
-ansible-playbook docker/ansible/vms/playbooks/docker_load_photos_like_k8s.yml --limit docker_nodes
+ansible -i "$INV" docker_nodes -m ping
+ansible-playbook -i "$INV" "$SEED" --limit docker_nodes
+ansible-playbook -i "$INV" "$LOAD" --limit docker_nodes
