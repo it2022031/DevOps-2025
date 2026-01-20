@@ -13,3 +13,17 @@
 # Ansible
 *.retry
 .idea/
+
+# Vagrant
+.vagrant/
+**/.vagrant/
+
+# Generated SSH configs
+infra/ssh/ssh.config
+vm/vagrant/ssh.config
+
+# Editors
+.vscode/
+
+# OS junk
+.DS_Store
