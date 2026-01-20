@@ -13,7 +13,7 @@ pipelineJob('infra-check') {
                     branches(branch)
                 }
             }
-            scriptPath('vm/vagrant/jenkins/jenkinsfiles/test.groovy')
+            scriptPath('ci/jenkins/jenkinsfiles/test.groovy')
             lightweight(true)
         }
     }
@@ -29,7 +29,7 @@ pipelineJob('deploy-vms') {
                     branches(branch)
                 }
             }
-            scriptPath('vm/vagrant/jenkins/jenkinsfiles/deploy_vms.groovy')
+            scriptPath('ci/jenkins/jenkinsfiles/deploy_vms.groovy')
             lightweight(true)
         }
     }
@@ -43,7 +43,7 @@ pipelineJob('deploy-docker') {
                     branches(branch)
                 }
             }
-            scriptPath('vm/vagrant/jenkins/jenkinsfiles/deploy_docker.groovy')
+            scriptPath('ci/jenkins/jenkinsfiles/deploy_docker.groovy')
             lightweight(true)
         }
     }
@@ -57,7 +57,7 @@ pipelineJob('deploy-k8s') {
                     branches(branch)
                 }
             }
-            scriptPath('vm/vagrant/jenkins/jenkinsfiles/deploy_k8s.groovy')
+            scriptPath('ci/jenkins/jenkinsfiles/deploy_k8s.groovy')
             lightweight(true)
         }
     }
@@ -66,7 +66,7 @@ pipelineJob('build-push-backend') {
     definition {
         cpsScm {
             scm { git { remote { url(repoUrl) }; branches(branch) } }
-            scriptPath('vm/vagrant/jenkins/jenkinsfiles/build_push_backend.groovy')
+            scriptPath('ci/jenkins/jenkinsfiles/build_push_backend.groovy')
             lightweight(true)
         }
     }
@@ -76,7 +76,7 @@ pipelineJob('build-push-frontend') {
     definition {
         cpsScm {
             scm { git { remote { url(repoUrl) }; branches(branch) } }
-            scriptPath('vm/vagrant/jenkins/jenkinsfiles/build_push_frontend.groovy')
+            scriptPath('ci/jenkins/jenkinsfiles/build_push_frontend.groovy')
             lightweight(true)
         }
     }
@@ -85,7 +85,7 @@ pipelineJob('build-push-images') {
     definition {
         cpsScm {
             scm { git { remote { url(repoUrl) }; branches(branch) } }
-            scriptPath('vm/vagrant/jenkins/jenkinsfiles/build_push_images.groovy')
+            scriptPath('ci/jenkins/jenkinsfiles/build_push_images.groovy')
             lightweight(true)
         }
     }
@@ -94,7 +94,7 @@ pipelineJob('seed-vms') {
     definition {
         cpsScm {
             scm { git { remote { url(repoUrl) }; branches(branch) } }
-            scriptPath('vm/vagrant/jenkins/jenkinsfiles/seed_vms.groovy')
+            scriptPath('ci/jenkins/jenkinsfiles/seed_vms.groovy')
             lightweight(true)
         }
     }
@@ -104,7 +104,7 @@ pipelineJob('seed-docker') {
     definition {
         cpsScm {
             scm { git { remote { url(repoUrl) }; branches(branch) } }
-            scriptPath('vm/vagrant/jenkins/jenkinsfiles/seed_docker.groovy')
+            scriptPath('ci/jenkins/jenkinsfiles/seed_docker.groovy')
             lightweight(true)
         }
     }
@@ -114,7 +114,7 @@ pipelineJob('seed-k8s') {
     definition {
         cpsScm {
             scm { git { remote { url(repoUrl) }; branches(branch) } }
-            scriptPath('vm/vagrant/jenkins/jenkinsfiles/seed_k8s.groovy')
+            scriptPath('ci/jenkins/jenkinsfiles/seed_k8s.groovy')
             lightweight(true)
         }
     }

@@ -2,12 +2,16 @@
 set -euo pipefail
 
 ROOT="$(git rev-parse --show-toplevel)"
-VAGRANT_DIR="$ROOT/vm/vagrant"
-cd "$VAGRANT_DIR"
-export ANSIBLE_CONFIG="$VAGRANT_DIR/ansible-host.cfg"
 
-TARGETS=(k8shost)
-TARGET_PATTERN="k8s_nodes"
+VAGRANT_DIR="$ROOT/infra/vagrant"
+INV="$ROOT/infra/inventories/hosts.ini"
+PLAYBOOK="$ROOT/ansible/k8s/playbooks/k8s_full_pipeline.yml"
+SSHCFG="$ROOT/infra/ssh/ssh.config"
+
+mkdir -p "$ROOT/infra/ssh"
+
+# 1) Vagrant actions
+cd "$VAGRANT_DIR"
 
 state="$(vagrant status k8shost --machine-readable | awk -F, '$3=="state" {print $4}' | tail -n1 || true)"
 if [ "$state" != "running" ]; then
@@ -17,17 +21,14 @@ else
   echo "✅ VM already running: k8shost"
 fi
 
-echo "🔁 Generating ssh.config from vagrant for: k8shost"
-for i in 1 2 3; do
-  if vagrant ssh-config k8shost > ssh.config; then
-    break
-  fi
-  echo "⏳ ssh-config not ready yet, retry $i/3..."
-  sleep 2
-done
+echo "🔁 Generating $SSHCFG from vagrant for: k8shost"
+vagrant ssh-config k8shost > "$SSHCFG"
 
-echo "🧪 Ansible ping (k8s)..."
-ansible -i hosts.ini "$TARGET_PATTERN" -m ping
+# 2) Ansible from repo root
+cd "$ROOT"
+
+echo "🧪 Ansible ping (k8s_nodes)..."
+ansible -i "$INV" k8s_nodes -m ping
 
 echo "🚀 Deploy k8s pipeline..."
-ansible-playbook -i hosts.ini k8s/playbooks/k8s_full_pipeline.yml --limit "$TARGET_PATTERN"
+ansible-playbook -i "$INV" "$PLAYBOOK" --limit k8s_nodes

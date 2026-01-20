@@ -1,8 +1,8 @@
 ---
 # 0) Ensure DS-2025 repo exists on dockerhost (reproducible)
-- import_playbook: ../../playbooks/clone_ds2025.yml
+- import_playbook: ../../vms/playbooks/clone_ds2025.yml
   vars:
-    target_hosts: docker
+    target_hosts: docker_nodes
     repo_url: "https://github.com/it2022031/DS-2025.git"
     project_dir: "/opt/DS-2025"
     repo_version: "main-branch"
@@ -11,11 +11,11 @@
 
 # 1) Seed DB using SQL that exists INSIDE the mounted DS-2025 repo
 - name: Seed DB in Docker from DS-2025 repo (no host copy)
-  hosts: docker
+  hosts: docker_nodes
   become: true
 
   vars:
-    compose_dir: "/vagrant/docker"
+    compose_dir: "/vagrant/ansible/docker"
     db_name: "demo_db"
     db_user: "demo_user"
 

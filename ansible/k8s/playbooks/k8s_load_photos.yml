@@ -6,8 +6,8 @@
   vars:
     ns: ds2025
 
-    load_sql_on_vm: /vagrant/sqlData/load_photos.sql
-    job_manifest_on_vm: /vagrant/k8s/manifests/16-postgres-load-photos-job.yml
+    load_sql_on_vm: /vagrant/data/sqlData/load_photos.sql
+    job_manifest_on_vm: /vagrant/ansible/k8s/manifests/16-postgres-load-photos-job.yml
 
     db_user: demo_user
     db_name: demo_db
@@ -20,7 +20,7 @@
 
     - name: Fail if load_photos.sql missing
       fail:
-        msg: "Missing {{ load_sql_on_vm }}. Put load_photos.sql under vm/vagrant/sqlData/"
+        msg: "Missing {{ load_sql_on_vm }}. Put load_photos.sql under vm/vagrant/data/sqlData/"
       when: not sql_stat.stat.exists
 
     - name: Ensure Postgres pod is Ready

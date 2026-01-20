@@ -1,6 +1,6 @@
 ---
 - name: Deploy DS-2025 stack on dockerhost via docker compose (pull from GHCR)
-  hosts: docker
+  hosts: docker_nodes
   become: true
 
   vars:

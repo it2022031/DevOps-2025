@@ -1,6 +1,6 @@
 ---
 - name: Install Docker + Docker Compose v2 on Ubuntu
-  hosts: docker
+  hosts: docker_nodes
   become: true
 
   vars:

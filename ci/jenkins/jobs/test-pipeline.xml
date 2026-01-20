@@ -20,7 +20,7 @@
             <submoduleCfg class="empty-list"/>
             <extensions/>
         </scm>
-        <scriptPath>vm/vagrant/jenkins/jenkinsfiles/test.groovy</scriptPath>
+        <scriptPath>ci/jenkins/jenkinsfiles/test.groovy</scriptPath>
         <lightweight>true</lightweight>
     </definition>
     <triggers/>

@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT="$(git rev-parse --show-toplevel)"
-VAGRANT_DIR="$ROOT/vm/vagrant"
+VAGRANT_DIR="$ROOT/infra/vagrant"
 cd "$VAGRANT_DIR"
 export ANSIBLE_CONFIG="$VAGRANT_DIR/ansible-host.cfg"
 
@@ -19,15 +19,15 @@ if [ "$need_up" -eq 1 ]; then
   vagrant up "${TARGETS[@]}"
 fi
 
-# Refresh ssh.config for these VMs
-echo "🔁 Generating ssh.config for: ${TARGETS[*]}"
-vagrant ssh-config "${TARGETS[@]}" > ssh.config
+# Refresh infra/ssh/ssh.config for these VMs
+echo "🔁 Generating infra/ssh/ssh.config for: ${TARGETS[*]}"
+vagrant ssh-config "${TARGETS[@]}" > infra/ssh/ssh.config
 
 echo "🧪 Ping..."
-ansible -i hosts.ini "backend:db:front" -m ping
+ansible -i infra/inventories/hosts.ini "backend:db:front" -m ping
 
 echo "🌱 Seed DB (VMs, k8s-like)..."
-ansible-playbook -i hosts.ini playbooks/vm_seed_like_k8s.yml --limit "backend_nodes:db_nodes"
+ansible-playbook -i infra/inventories/hosts.ini ansible/vms/playbooks/vm_seed_like_k8s.yml --limit "backend_nodes:db_nodes"
 
 echo "🖼️ Load photos (DB VM, k8s-like)..."
-ansible-playbook -i hosts.ini playbooks/vm_load_photos_like_k8s.yml --limit "db_nodes"
+ansible-playbook -i infra/inventories/hosts.ini ansible/vms/playbooks/vm_load_photos_like_k8s.yml --limit "db_nodes"

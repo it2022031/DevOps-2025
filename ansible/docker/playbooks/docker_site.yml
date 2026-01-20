@@ -8,7 +8,7 @@
   become: true
 
   vars:
-    compose_dir: "/vagrant/docker"
+    compose_dir: "/vagrant/ansible/docker"
 
   tasks:
     - name: Ensure docker-compose.yml exists

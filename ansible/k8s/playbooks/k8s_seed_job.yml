@@ -5,8 +5,8 @@
 
   vars:
     ns: ds2025
-    seed_sql_on_vm: /vagrant/sqlData/test_dedomena.sql
-    job_manifest_on_vm: /vagrant/k8s/manifests/15-postgres-seed-job.yml
+    seed_sql_on_vm: /vagrant/data/sqlData/test_dedomena.sql
+    job_manifest_on_vm: /vagrant/ansible/k8s/manifests/15-postgres-seed-job.yml
 
   tasks:
     - name: Ensure seed SQL exists on k8shost (synced folder)
@@ -16,7 +16,7 @@
 
     - name: Fail if seed SQL missing
       fail:
-        msg: "Missing {{ seed_sql_on_vm }}. Put test_dedomena.sql under vm/vagrant/sqlData/"
+        msg: "Missing {{ seed_sql_on_vm }}. Put test_dedomena.sql under vm/vagrant/data/sqlData/"
       when: not sql_stat.stat.exists
 
     - name: Create/update ConfigMap ds2025-seed-sql from sqlData/test_dedomena.sql

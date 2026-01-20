@@ -1,5 +1,5 @@
 ---
-- name: Seed PostgreSQL on VMs from /vagrant/sqlData/test_dedomena.sql
+- name: Seed PostgreSQL on VMs from /vagrant/data/sqlData/test_dedomena.sql
   hosts: backend_nodes
   become: true
 
@@ -9,7 +9,7 @@
     db_name: demo_db
     db_user: demo_user
     db_pass: demo_pass
-    seed_sql: /vagrant/sqlData/test_dedomena.sql
+    seed_sql: /vagrant/data/sqlData/test_dedomena.sql
 
   tasks:
     - name: Ensure psql client exists on backend
@@ -25,7 +25,7 @@
 
     - name: Fail if seed SQL missing
       fail:
-        msg: "Missing {{ seed_sql }} (expected in vm/vagrant/sqlData/test_dedomena.sql)"
+        msg: "Missing {{ seed_sql }} (expected in vm/vagrant/data/sqlData/test_dedomena.sql)"
       when: not s.stat.exists
 
     - name: Wait for DB reachable

@@ -119,7 +119,7 @@ spec:
         # read-only source from the VM (Vagrant synced folder inside k8shost)
         - name: photos-src
           hostPath:
-            path: /vagrant/sqlData/photos
+            path: /vagrant/data/sqlData/photos
             type: Directory
 
         # writable working dir inside the pod

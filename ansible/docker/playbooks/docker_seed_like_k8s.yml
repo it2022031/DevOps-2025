@@ -4,7 +4,7 @@
   become: true
 
   vars:
-    compose_dir: "/vagrant/docker"
+    compose_dir: "/vagrant/ansible/docker"
     db_name: "demo_db"
     db_user: "demo_user"
     seed_sql_in_container: "/seed/test_dedomena.sql"

@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT="$(git rev-parse --show-toplevel)"
-VAGRANT_DIR="$ROOT/vm/vagrant"
+VAGRANT_DIR="$ROOT/infra/vagrant"
 cd "$VAGRANT_DIR"
 export ANSIBLE_CONFIG="$VAGRANT_DIR/ansible-host.cfg"
 
@@ -16,25 +16,25 @@ else
   echo "✅ VM already running: jenkins"
 fi
 
-echo "🔁 Generating ssh.config from vagrant for: jenkins"
+echo "🔁 Generating infra/ssh/ssh.config from vagrant for: jenkins"
 for i in 1 2 3; do
-  if vagrant ssh-config jenkins > ssh.config; then
+  if vagrant ssh-config jenkins > infra/ssh/ssh.config; then
     break
   fi
   sleep 2
 done
 
 echo "🧪 Ansible ping (jenkins)..."
-ansible -i hosts.ini "$TARGET_PATTERN" -m ping
+ansible -i infra/inventories/hosts.ini "$TARGET_PATTERN" -m ping
 
 echo "🚀 Install Jenkins..."
-ansible-playbook -i hosts.ini jenkins/playbooks/jenkins_install.yml --limit "$TARGET_PATTERN"
+ansible-playbook -i infra/inventories/hosts.ini jenkins/ansible/vms/playbooks/jenkins_install.yml --limit "$TARGET_PATTERN"
 
 echo "🧩 Configure Jenkins SSH + prerequisites..."
-ansible-playbook -i hosts.ini jenkins/playbooks/jenkins_ssh_setup.yml --limit "$TARGET_PATTERN"
-ansible-playbook -i hosts.ini jenkins/playbooks/jenkins_docker_prereqs.yml --limit "$TARGET_PATTERN"
+ansible-playbook -i infra/inventories/hosts.ini jenkins/ansible/vms/playbooks/jenkins_ssh_setup.yml --limit "$TARGET_PATTERN"
+ansible-playbook -i infra/inventories/hosts.ini jenkins/ansible/vms/playbooks/jenkins_docker_prereqs.yml --limit "$TARGET_PATTERN"
 
 echo "📦 Create/Update Jenkins job(s)..."
-#ansible-playbook -i hosts.ini jenkins/playbooks/jenkins_create_job.yml --limit "$TARGET_PATTERN" || true
+#ansible-playbook -i infra/inventories/hosts.ini jenkins/ansible/vms/playbooks/jenkins_create_job.yml --limit "$TARGET_PATTERN" || true
 
 

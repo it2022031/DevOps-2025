@@ -1,6 +1,6 @@
 ---
 - name: Build & push DS-2025 images on dockerhost to GHCR
-  hosts: docker
+  hosts: docker_nodes
   become: true
 
   vars:

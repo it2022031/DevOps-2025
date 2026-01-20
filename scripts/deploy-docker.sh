@@ -2,12 +2,16 @@
 set -euo pipefail
 
 ROOT="$(git rev-parse --show-toplevel)"
-VAGRANT_DIR="$ROOT/vm/vagrant"
-cd "$VAGRANT_DIR"
-export ANSIBLE_CONFIG="$VAGRANT_DIR/ansible-host.cfg"
 
-TARGETS=(dockerhost)
-TARGET_PATTERN="dockerhost"
+VAGRANT_DIR="$ROOT/infra/vagrant"
+INV="$ROOT/infra/inventories/hosts.ini"
+PLAYBOOK="$ROOT/ansible/docker/playbooks/docker_site.yml"
+SSHCFG="$ROOT/infra/ssh/ssh.config"
+
+mkdir -p "$ROOT/infra/ssh"
+
+# 1) Vagrant actions
+cd "$VAGRANT_DIR"
 
 state="$(vagrant status dockerhost --machine-readable | awk -F, '$3=="state" {print $4}' | tail -n1 || true)"
 if [ "$state" != "running" ]; then
@@ -17,17 +21,14 @@ else
   echo "✅ VM already running: dockerhost"
 fi
 
-echo "🔁 Generating ssh.config from vagrant for: dockerhost"
-for i in 1 2 3; do
-  if vagrant ssh-config dockerhost > ssh.config; then
-    break
-  fi
-  echo "⏳ ssh-config not ready yet, retry $i/3..."
-  sleep 2
-done
+echo "🔁 Generating $SSHCFG from vagrant for: dockerhost"
+vagrant ssh-config dockerhost > "$SSHCFG"
 
-echo "🧪 Ansible ping (dockerhost)..."
-ansible -i hosts.ini "$TARGET_PATTERN" -m ping
+# 2) Ansible from repo root (so inventory relative ssh_args works)
+cd "$ROOT"
+
+echo "🧪 Ansible ping (docker_nodes)..."
+ansible -i "$INV" docker_nodes -m ping
 
 echo "🚀 Deploy docker stack..."
-ansible-playbook -i hosts.ini docker/playbooks/docker_site.yml --limit "$TARGET_PATTERN"
+ansible-playbook -i "$INV" "$PLAYBOOK" --limit docker_nodes

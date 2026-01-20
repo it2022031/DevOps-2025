@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT="$(git rev-parse --show-toplevel)"
-VAGRANT_DIR="$ROOT/vm/vagrant"
+VAGRANT_DIR="$ROOT/infra/vagrant"
 cd "$VAGRANT_DIR"
 
 export ANSIBLE_CONFIG="$VAGRANT_DIR/ansible-host.cfg"
@@ -14,10 +14,10 @@ if [ "$state" != "running" ]; then
   vagrant up dockerhost
 fi
 
-# Refresh ssh.config so Ansible can reach dockerhost
-vagrant ssh-config dockerhost > ssh.config
+# Refresh infra/ssh/ssh.config so Ansible can reach dockerhost
+vagrant ssh-config dockerhost > infra/ssh/ssh.config
 
 # Seed + load photos (k8s-like) on dockerhost
-ansible -i hosts.ini docker_nodes -m ping
-ansible-playbook docker/playbooks/docker_seed_like_k8s.yml --limit docker_nodes
-ansible-playbook docker/playbooks/docker_load_photos_like_k8s.yml --limit docker_nodes
+ansible -i infra/inventories/hosts.ini docker_nodes -m ping
+ansible-playbook docker/ansible/vms/playbooks/docker_seed_like_k8s.yml --limit docker_nodes
+ansible-playbook docker/ansible/vms/playbooks/docker_load_photos_like_k8s.yml --limit docker_nodes
