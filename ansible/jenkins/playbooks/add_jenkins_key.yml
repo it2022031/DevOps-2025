@@ -1,20 +1,43 @@
 ---
-- name: Add Jenkins VM public key to all target VMs
-  hosts: all
-  become: false
-  vars:
-    jenkins_pubkey: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIIAD3CR/IVVNdKHcUTiLwfqNv96At/EIKLY5IvbQBhWO vagrant@jenkins"
+- name: Read Jenkins public key from Jenkins VM
+  hosts: jenkins_nodes
+  become: true
   tasks:
-    - name: Ensure ~/.ssh exists
+    - name: Ensure Jenkins public key exists on Jenkins VM
+      stat:
+        path: /home/vagrant/.ssh/jenkins_id.pub
+      register: pub_stat
+
+    - name: Fail if Jenkins public key is missing
+      fail:
+        msg: "Missing /home/vagrant/.ssh/jenkins_id.pub on Jenkins VM. Run jenkins_ssh_setup.yml first."
+      when: not pub_stat.stat.exists
+
+    - name: Read Jenkins public key
+      slurp:
+        src: /home/vagrant/.ssh/jenkins_id.pub
+      register: pub
+
+    - name: Store public key as fact
+      set_fact:
+        jenkins_pubkey: "{{ pub.content | b64decode | trim }}"
+
+- name: Add Jenkins public key to target VMs (vagrant user)
+  hosts: vms:docker_nodes:k8s_nodes
+  become: true
+  vars:
+    jenkins_pubkey: "{{ hostvars[groups['jenkins_nodes'][0]].jenkins_pubkey }}"
+  tasks:
+    - name: Ensure ~/.ssh exists for vagrant
       file:
-        path: "/home/vagrant/.ssh"
+        path: /home/vagrant/.ssh
         state: directory
+        owner: vagrant
+        group: vagrant
         mode: "0700"
 
-    - name: Add Jenkins key to authorized_keys
-      lineinfile:
-        path: "/home/vagrant/.ssh/authorized_keys"
-        create: true
-        mode: "0600"
-        line: "{{ jenkins_pubkey }}"
+    - name: Authorize Jenkins key for vagrant user
+      authorized_key:
+        user: vagrant
+        key: "{{ jenkins_pubkey }}"
         state: present

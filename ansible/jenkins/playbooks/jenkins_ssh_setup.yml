@@ -21,6 +21,20 @@
         group: jenkins
         mode: "0700"
 
+    - name: Ensure vagrant .ssh exists (for seed key)
+      file:
+        path: /home/vagrant/.ssh
+        state: directory
+        owner: vagrant
+        group: vagrant
+        mode: "0700"
+
+    - name: Generate SSH keypair for Jenkins (as vagrant) if missing
+      become_user: vagrant
+      command: ssh-keygen -t ed25519 -N "" -f /home/vagrant/.ssh/jenkins_id
+      args:
+        creates: /home/vagrant/.ssh/jenkins_id
+
     - name: Copy private key to jenkins user
       copy:
         src: "{{ src_key }}"
@@ -85,7 +99,9 @@
       shell: "ssh backend 'hostname'"
       register: ssh_test
       changed_when: false
+      ignore_errors: true
 
     - name: Show SSH test output
       debug:
         var: ssh_test.stdout
+      when: ssh_test is defined

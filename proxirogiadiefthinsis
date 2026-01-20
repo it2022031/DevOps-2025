@@ -1,0 +1,53 @@
+Όλα τα URLs / “APIs” για να τα σημειώσεις (με βάση τα ports σου)
+A) VMs περιβάλλον (backend/front VMs)
+
+Frontend (VM front):
+http://127.0.0.1:8090
+
+Backend (μέσω nginx στο backend VM):
+http://127.0.0.1:8088
+
+MailHog UI (στο backend VM):
+http://127.0.0.1:8025
+
+B) Docker περιβάλλον (VM dockerhost)
+
+Frontend:
+http://127.0.0.1:8081
+
+Backend API:
+http://127.0.0.1:8080
+
+MailHog UI:
+http://127.0.0.1:8026
+
+MinIO Console:
+http://127.0.0.1:9002
+
+Σημείωση: στο docker-compose σου το MailHog είναι 8025:8025, αλλά στο host ports σου είχε βγει πριν 8026. Αν τώρα ανοίγει στο 8025 (γιατί το VM forward δεν αλλάζει), κράτα αυτό που βλέπεις στον browser. Για σιγουριά:
+
+cd infra/vagrant
+vagrant port dockerhost
+
+C) Kubernetes περιβάλλον (VM k8shost)
+
+Ingress (Frontend + /api):
+http://127.0.0.1:8082
+
+Backend API μέσω ingress:
+http://127.0.0.1:8082/api
+
+Ingress HTTPS (αν το χρησιμοποιείς):
+https://127.0.0.1:8443 (browser warning αν self-signed)
+
+MailHog UI (K8s) μέσω port-forward:
+http://127.0.0.1:18025
+(αρκεί να τρέχει το port-forward command)
+
+MicroK8s API (αν το χρειάζεσαι):
+https://127.0.0.1:16443 (συνήθως για kubectl clients)
+
+
+jenkins//////
+http://127.0.0.1:8083/
+
