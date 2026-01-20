@@ -63,11 +63,24 @@
       delay: 2
       until: jenkins_http.status == 200
 
-    - name: Read initial admin password
+    - name: Check if initialAdminPassword exists
+      stat:
+        path: /var/lib/jenkins/secrets/initialAdminPassword
+      register: initpw
+
+    - name: Read initial admin password (first-run only)
       command: cat /var/lib/jenkins/secrets/initialAdminPassword
-      register: admin_pass
+      when: initpw.stat.exists
+      register: initpw_out
       changed_when: false
 
-    - name: Show initial admin password
+    - name: Show initial admin password (first-run only)
       debug:
-        msg: "Initial Jenkins admin password: {{ admin_pass.stdout }}"
+        msg: "Initial admin password: {{ initpw_out.stdout }}"
+      when: initpw.stat.exists
+
+
+    - name: Show initial admin password (legacy)
+      debug:
+        msg: "{{ initpw_out.stdout }}"
+      when: initpw.stat.exists

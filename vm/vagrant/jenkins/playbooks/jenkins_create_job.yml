@@ -12,6 +12,14 @@
     job_xml_path: "/home/vagrant/DevOps-2025/vm/vagrant/jenkins/jobs/test-pipeline.xml"
 
   tasks:
+    - name: Clone DevOps-2025 repo on Jenkins VM (if missing)
+      git:
+        repo: https://github.com/it2022031/DevOps-2025.git
+        dest: /home/vagrant/DevOps-2025
+        version: main
+        update: yes
+      become: true
+      become_user: vagrant
     - name: Ensure repo exists on Jenkins VM (so it can read the XML file path)
       stat:
         path: "/home/vagrant/DevOps-2025"

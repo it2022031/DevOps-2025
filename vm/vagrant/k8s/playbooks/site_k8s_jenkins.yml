@@ -1,6 +1,6 @@
 ---
 - name: Apply DS-2025 Kubernetes manifests
-  hosts: k8s
+  hosts: k8s_nodes
   become: true
 
   vars:

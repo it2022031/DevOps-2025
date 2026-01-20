@@ -4,7 +4,7 @@
 
 # 2) Bring up docker-compose stack
 - name: Bring up DS-2025 docker-compose
-  hosts: docker
+  hosts: docker_nodes
   become: true
 
   vars:

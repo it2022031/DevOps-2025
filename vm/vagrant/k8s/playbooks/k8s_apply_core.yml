@@ -1,6 +1,6 @@
 ---
 - name: Apply core Kubernetes manifests (ds2025)
-  hosts: k8s
+  hosts: k8s_nodes
   become: true
 
   vars:

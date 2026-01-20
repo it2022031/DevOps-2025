@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(git rev-parse --show-toplevel)"
+VAGRANT_DIR="$ROOT/vm/vagrant"
+cd "$VAGRANT_DIR"
+
+TARGET_PATTERN="jenkins_nodes"
+
+state="$(vagrant status jenkins --machine-readable | awk -F, '$3=="state" {print $4}' | tail -n1 || true)"
+if [ "$state" != "running" ]; then
+  echo "🔧 Bringing up: jenkins"
+  vagrant up jenkins
+else
+  echo "✅ VM already running: jenkins"
+fi
+
+echo "🔁 Generating ssh.config from vagrant for: jenkins"
+for i in 1 2 3; do
+  if vagrant ssh-config jenkins > ssh.config; then
+    break
+  fi
+  sleep 2
+done
+
+echo "🧪 Ansible ping (jenkins)..."
+ansible -i hosts.ini "$TARGET_PATTERN" -m ping
+
+echo "🚀 Install Jenkins..."
+ansible-playbook -i hosts.ini jenkins/playbooks/jenkins_install.yml --limit "$TARGET_PATTERN"
+
+echo "🧩 Configure Jenkins SSH + prerequisites..."
+ansible-playbook -i hosts.ini jenkins/playbooks/jenkins_ssh_setup.yml --limit "$TARGET_PATTERN"
+ansible-playbook -i hosts.ini jenkins/playbooks/jenkins_docker_prereqs.yml --limit "$TARGET_PATTERN"
+
+echo "📦 Create/Update Jenkins job(s)..."
+ansible-playbook -i hosts.ini jenkins/playbooks/jenkins_create_job.yml --limit "$TARGET_PATTERN"

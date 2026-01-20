@@ -1,6 +1,6 @@
 ---
 - name: Load photos into PostgreSQL in Kubernetes (ConfigMap + Job 16) + sanity checks
-  hosts: k8s
+  hosts: k8s_nodes
   become: true
 
   vars:

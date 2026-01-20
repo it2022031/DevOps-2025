@@ -1,6 +1,6 @@
 ---
 - name: Seed PostgreSQL in Kubernetes (ConfigMap + Job 15) + sanity checks
-  hosts: k8s
+  hosts: k8s_nodes
   become: true
 
   vars:
