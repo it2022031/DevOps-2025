@@ -1,6 +1,6 @@
 ---
 - name: Load photos in Docker from /seed/load_photos.sql (k8s-like)
-  hosts: docker
+  hosts: docker_nodes
   become: true
 
   vars:

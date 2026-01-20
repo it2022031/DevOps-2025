@@ -1,10 +1,10 @@
 ---
 - name: Seed PostgreSQL on VMs from /vagrant/sqlData/test_dedomena.sql
-  hosts: backend
+  hosts: backend_nodes
   become: true
 
   vars:
-    db_host: "{{ hostvars['db'].ansible_host }}"
+    db_host: "{{ hostvars['db'].db_private_ip }}"
     db_port: 5432
     db_name: demo_db
     db_user: demo_user

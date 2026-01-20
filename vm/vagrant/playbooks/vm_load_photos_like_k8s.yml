@@ -1,6 +1,7 @@
 ---
 - name: Load photos on DB VM using /vagrant/sqlData (no copy, k8s-like)
-  hosts: db
+  hosts: db_nodes
+
   become: true
 
   vars:

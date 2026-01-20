@@ -4,6 +4,7 @@ set -euo pipefail
 ROOT="$(git rev-parse --show-toplevel)"
 VAGRANT_DIR="$ROOT/vm/vagrant"
 cd "$VAGRANT_DIR"
+export ANSIBLE_CONFIG="$VAGRANT_DIR/ansible-host.cfg"
 
 TARGET_PATTERN="jenkins_nodes"
 
@@ -34,4 +35,6 @@ ansible-playbook -i hosts.ini jenkins/playbooks/jenkins_ssh_setup.yml --limit "$
 ansible-playbook -i hosts.ini jenkins/playbooks/jenkins_docker_prereqs.yml --limit "$TARGET_PATTERN"
 
 echo "📦 Create/Update Jenkins job(s)..."
-ansible-playbook -i hosts.ini jenkins/playbooks/jenkins_create_job.yml --limit "$TARGET_PATTERN"
+#ansible-playbook -i hosts.ini jenkins/playbooks/jenkins_create_job.yml --limit "$TARGET_PATTERN" || true
+
+

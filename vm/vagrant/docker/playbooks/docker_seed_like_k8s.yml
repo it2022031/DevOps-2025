@@ -1,6 +1,6 @@
 ---
 - name: Seed DB in Docker from /seed/test_dedomena.sql (k8s-like)
-  hosts: docker
+  hosts: docker_nodes
   become: true
 
   vars:

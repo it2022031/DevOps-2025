@@ -4,6 +4,7 @@ set -euo pipefail
 ROOT="$(git rev-parse --show-toplevel)"
 VAGRANT_DIR="$ROOT/vm/vagrant"
 cd "$VAGRANT_DIR"
+export ANSIBLE_CONFIG="$VAGRANT_DIR/ansible-host.cfg"
 
 TARGETS=(backend db front)
 TARGET_PATTERN="backend:db:front"

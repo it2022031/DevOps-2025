@@ -4,9 +4,9 @@ set -euo pipefail
 ROOT="$(git rev-parse --show-toplevel)"
 VAGRANT_DIR="$ROOT/vm/vagrant"
 cd "$VAGRANT_DIR"
+export ANSIBLE_CONFIG="$VAGRANT_DIR/ansible-host.cfg"
 
 TARGETS=(backend db front)
-TARGET_PATTERN="backend:db:front"
 
 # Ensure VMs up
 need_up=0
@@ -24,10 +24,10 @@ echo "🔁 Generating ssh.config for: ${TARGETS[*]}"
 vagrant ssh-config "${TARGETS[@]}" > ssh.config
 
 echo "🧪 Ping..."
-ansible -i hosts.ini "$TARGET_PATTERN" -m ping
+ansible -i hosts.ini "backend:db:front" -m ping
 
-echo "🌱 Seed DB..."
-ansible-playbook -i hosts.ini playbooks/vm_seed_like_k8s.yml --limit "$TARGET_PATTERN"
+echo "🌱 Seed DB (VMs, k8s-like)..."
+ansible-playbook -i hosts.ini playbooks/vm_seed_like_k8s.yml --limit "backend_nodes:db_nodes"
 
-echo "🖼️ Load photos..."
-ansible-playbook -i hosts.ini playbooks/vm_load_photos_like_k8s.yml --limit "$TARGET_PATTERN"
+echo "🖼️ Load photos (DB VM, k8s-like)..."
+ansible-playbook -i hosts.ini playbooks/vm_load_photos_like_k8s.yml --limit "db_nodes"
