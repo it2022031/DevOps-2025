@@ -1,6 +1,5 @@
 pipeline {
     agent any
-
     options { timestamps() }
 
     environment {
@@ -16,8 +15,7 @@ pipeline {
             steps {
                 sh '''
           set -e
-          cd vm/vagrant
-          ansible -i hosts_jenkins.ini k8s -m ping
+          ansible -i infra/inventories/hosts_jenkins.ini k8s -m ping
         '''
             }
         }
@@ -26,8 +24,7 @@ pipeline {
             steps {
                 sh '''
           set -e
-          cd vm/vagrant
-          ansible-playbook -i hosts_jenkins.ini k8s/playbooks/microk8s_install.yml
+          ansible-playbook -i infra/inventories/hosts_jenkins.ini ansible/k8s/playbooks/microk8s_install.yml --limit k8s
         '''
             }
         }
@@ -36,11 +33,20 @@ pipeline {
             steps {
                 sh '''
           set -e
-          cd vm/vagrant
-          ansible-playbook -i hosts_jenkins.ini k8s/playbooks/k8s_apply_core.yml
+          ansible-playbook -i infra/inventories/hosts_jenkins.ini ansible/k8s/playbooks/k8s_apply_core.yml --limit k8s
         '''
             }
         }
+
+//        stage('Seed DB + Load photos') {
+//            steps {
+//                sh '''
+//          set -e
+//          ansible-playbook -i infra/inventories/hosts_jenkins.ini ansible/k8s/playbooks/k8s_seed_db.yml --limit k8s
+//          ansible-playbook -i infra/inventories/hosts_jenkins.ini ansible/k8s/playbooks/k8s_load_photos.yml --limit k8s
+//        '''
+//            }
+//        }
     }
 
     post {
