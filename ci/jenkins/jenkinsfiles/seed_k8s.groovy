@@ -1,7 +1,11 @@
 pipeline {
     agent any
     options { timestamps() }
-    environment { ANSIBLE_HOST_KEY_CHECKING = "False" }
+
+    environment {
+        ANSIBLE_HOST_KEY_CHECKING = "False"
+        ANSIBLE_CONFIG = "infra/ansible/ansible-jenkins.cfg"
+    }
 
     stages {
         stage('Checkout') { steps { checkout scm } }
@@ -10,8 +14,7 @@ pipeline {
             steps {
                 sh '''
           set -e
-          cd vm/vagrant
-          ansible-playbook -i hosts_jenkins.ini k8s/playbooks/k8s_seed_db.yml
+          ansible-playbook -i infra/inventories/hosts_jenkins.ini ansible/k8s/playbooks/k8s_seed_db.yml --limit k8s
         '''
             }
         }
@@ -20,8 +23,7 @@ pipeline {
             steps {
                 sh '''
           set -e
-          cd vm/vagrant
-          ansible-playbook -i hosts_jenkins.ini k8s/playbooks/k8s_load_photos.yml
+          ansible-playbook -i infra/inventories/hosts_jenkins.ini ansible/k8s/playbooks/k8s_load_photos.yml --limit k8s
         '''
             }
         }

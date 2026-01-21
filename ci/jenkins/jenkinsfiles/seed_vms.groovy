@@ -14,8 +14,7 @@ pipeline {
             steps {
                 sh '''
           set -e
-          cd vm/vagrant
-          ansible-playbook -i hosts_jenkins.ini playbooks/vm_seed_like_k8s.yml
+          ansible-playbook -i infra/inventories/hosts_jenkins.ini ansible/vms/playbooks/vm_seed_like_k8s.yml --limit vms
         '''
             }
         }
@@ -24,8 +23,7 @@ pipeline {
             steps {
                 sh '''
           set -e
-          cd vm/vagrant
-          ansible-playbook -i hosts_jenkins.ini playbooks/vm_load_photos_like_k8s.yml
+          ansible-playbook -i infra/inventories/hosts_jenkins.ini ansible/vms/playbooks/vm_load_photos_like_k8s.yml --limit vms
         '''
             }
         }

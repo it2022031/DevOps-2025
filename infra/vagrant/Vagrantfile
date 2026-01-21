@@ -9,16 +9,14 @@ Vagrant.configure("2") do |config|
     vb.cpus = 2
   end
 
-  INTNET_NAME = "dsnet"
-
   # -------- backend --------
   config.vm.define "backend" do |h|
     h.vm.hostname = "backend"
 
+    # Host-only network (vboxnet0 is usually 192.168.56.1/24 on the host)
     h.vm.network "private_network",
-      ip: "10.10.10.11",
-      netmask: "255.255.255.0",
-      virtualbox__intnet: INTNET_NAME
+      ip: "192.168.56.101",
+      netmask: "255.255.255.0"
 
     # Host -> Backend nginx (80)
     # Open on host: http://127.0.0.1:8088
@@ -27,9 +25,6 @@ Vagrant.configure("2") do |config|
     # Host -> MailHog UI (runs on backend VM)
     # Open on host: http://127.0.0.1:8025
     h.vm.network "forwarded_port", guest: 8025, host: 8025, auto_correct: true
-
-    # (Optional) Host -> MailHog SMTP (useful for testing)
-    # h.vm.network "forwarded_port", guest: 1025, host: 1025, auto_correct: true
 
     h.vm.provider "virtualbox" do |vb|
       vb_defaults(vb)
@@ -41,9 +36,8 @@ Vagrant.configure("2") do |config|
     h.vm.hostname = "db"
 
     h.vm.network "private_network",
-      ip: "10.10.10.12",
-      netmask: "255.255.255.0",
-      virtualbox__intnet: INTNET_NAME
+      ip: "192.168.56.102",
+      netmask: "255.255.255.0"
 
     h.vm.provider "virtualbox" do |vb|
       vb_defaults(vb)
@@ -55,9 +49,8 @@ Vagrant.configure("2") do |config|
     h.vm.hostname = "front"
 
     h.vm.network "private_network",
-      ip: "10.10.10.13",
-      netmask: "255.255.255.0",
-      virtualbox__intnet: INTNET_NAME
+      ip: "192.168.56.103",
+      netmask: "255.255.255.0"
 
     # Host -> Front nginx (80)
     # Open on host: http://127.0.0.1:8090
@@ -73,9 +66,8 @@ Vagrant.configure("2") do |config|
     h.vm.hostname = "dockerhost"
 
     h.vm.network "private_network",
-      ip: "10.10.10.14",
-      netmask: "255.255.255.0",
-      virtualbox__intnet: INTNET_NAME
+      ip: "192.168.56.104",
+      netmask: "255.255.255.0"
 
     # Frontend
     h.vm.network "forwarded_port", guest: 8081, host: 8081, auto_correct: true
@@ -89,7 +81,6 @@ Vagrant.configure("2") do |config|
     # MinIO Console
     h.vm.network "forwarded_port", guest: 9001, host: 9002, auto_correct: true
 
-
     h.vm.provider "virtualbox" do |vb|
       vb_defaults(vb)
     end
@@ -100,12 +91,10 @@ Vagrant.configure("2") do |config|
     h.vm.hostname = "k8shost"
 
     h.vm.network "private_network",
-      ip: "10.10.10.15",
-      netmask: "255.255.255.0",
-      virtualbox__intnet: INTNET_NAME
+      ip: "192.168.56.105",
+      netmask: "255.255.255.0"
 
     # Optional: expose ingress HTTP/HTTPS from the k8s VM to your host
-    # Later, when we enable ingress:
     h.vm.network "forwarded_port", guest: 80, host: 8082, auto_correct: true
     h.vm.network "forwarded_port", guest: 443, host: 8443, auto_correct: true
 
@@ -121,14 +110,13 @@ Vagrant.configure("2") do |config|
     end
   end
 
-  # -------- jenkins (NEW) --------
+  # -------- jenkins --------
   config.vm.define "jenkins" do |h|
     h.vm.hostname = "jenkins"
 
     h.vm.network "private_network",
-      ip: "10.10.10.16",
-      netmask: "255.255.255.0",
-      virtualbox__intnet: INTNET_NAME
+      ip: "192.168.56.106",
+      netmask: "255.255.255.0"
 
     # Jenkins UI
     # Open on host: http://127.0.0.1:8083
