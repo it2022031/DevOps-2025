@@ -13,7 +13,7 @@ pipeline {
             steps {
                 sh '''
           set -e
-          ansible -i infra/inventories/hosts_jenkins.ini all -m ping
+          ansible -i infra/inventories/hosts_jenkins.ini vms -m ping
         '''
             }
         }
