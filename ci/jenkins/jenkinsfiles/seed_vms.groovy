@@ -1,7 +1,11 @@
 pipeline {
     agent any
     options { timestamps() }
-    environment { ANSIBLE_HOST_KEY_CHECKING = "False" }
+
+    environment {
+        ANSIBLE_HOST_KEY_CHECKING = "False"
+        ANSIBLE_CONFIG = "infra/ansible/ansible-jenkins.cfg"
+    }
 
     stages {
         stage('Checkout') { steps { checkout scm } }

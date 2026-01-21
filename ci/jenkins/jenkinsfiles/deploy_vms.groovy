@@ -4,6 +4,7 @@ pipeline {
 
     environment {
         ANSIBLE_HOST_KEY_CHECKING = "False"
+        ANSIBLE_CONFIG = "infra/ansible/ansible-jenkins.cfg"
     }
 
     stages {
