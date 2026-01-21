@@ -1,6 +1,6 @@
 ---
 - name: Build & push DS-2025 images on dockerhost to GHCR
-  hosts: docker_nodes
+  hosts: docker
   become: true
 
   vars:
@@ -9,13 +9,12 @@
     repo_dest: "{{ project_dir }}/DevOps-2025"
 
     ghcr_user: "it2022031"
-    ghcr_token: "{{ ghcr_token }}"
 
     backend_image: "ghcr.io/it2022031/ds2025-backend:latest"
     frontend_image: "ghcr.io/it2022031/ds2025-frontend:latest"
 
     build_context: "{{ repo_dest }}/ansible/docker"
-    docker_dir: "{{ build_context }}/docker"
+
     repo_url_app: "https://github.com/it2022031/DS-2025.git"
     repo_branch_app: "main-branch"
 
