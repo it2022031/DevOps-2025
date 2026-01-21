@@ -1,5 +1,6 @@
+---
 - name: Ensure DS2025 hostnames resolve
-  hosts: all
+  hosts: vms
   become: true
   tasks:
     - name: Add DS2025 entries to /etc/hosts
@@ -7,9 +8,6 @@
         path: /etc/hosts
         marker: "# {mark} DS2025"
         block: |
-          {{ hostvars['backend'].ansible_host }} backend
-          {{ hostvars['db'].ansible_host }} db
-          {{ hostvars['front'].ansible_host }} front
-          {% if 'dockerhost' in groups %}{{ hostvars['dockerhost'].ansible_host }} dockerhost{% endif %}
-          {% if 'k8shost' in groups %}{{ hostvars['k8shost'].ansible_host }} k8shost{% endif %}
-          {% if 'jenkins' in groups %}{{ hostvars['jenkins'].ansible_host }} jenkins{% endif %}
+          {{ hostvars['backend'].private_ip }} backend
+          {{ hostvars['db'].private_ip }} db
+          {{ hostvars['front'].private_ip }} front
