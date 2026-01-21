@@ -18,7 +18,7 @@
     enable_api_proxy: false
     api_prefix: "/api/"
     # ✅ default: backend host from inventory (no hardcoded IP)
-    api_upstream_host: "{{ hostvars['backend'].ansible_host | default('127.0.0.1') }}"
+    api_upstream_host: "{{ hostvars['backend'].ansible_host | default(hostvars['backend'].inventory_hostname) | default('127.0.0.1') }}"
     api_upstream_port: 8080
 
   tasks:

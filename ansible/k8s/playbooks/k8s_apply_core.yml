@@ -1,12 +1,12 @@
 ---
 - name: Apply core Kubernetes manifests (ds2025)
-  hosts: k8s_nodes
+  hosts: k8s
   become: true
 
   vars:
     ns: ds2025
     manifests_dir: /vagrant/ansible/k8s/manifests
-
+    microk8s_bin: /snap/bin/microk8s
     core_files:
       - 00-namespace.yml
       - 10-postgres.yml
