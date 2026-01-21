@@ -82,7 +82,7 @@
     upstream_port: 8081
     enable_api_proxy: true
     api_prefix: "/api/"
-    api_upstream_host: 10.10.10.11
+    api_upstream_host: "backend"
     api_upstream_port: 8080
 
 - import_playbook: nginx_enable_site.yml

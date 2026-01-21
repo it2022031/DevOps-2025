@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT="$(git rev-parse --show-toplevel)"
 
 VAGRANT_DIR="$ROOT/infra/vagrant"
-INV="$ROOT/infra/inventories/vagrant_local.ini"
+INV="$ROOT/infra/inventories/hosts.ini"
 SSHCFG="$ROOT/infra/ssh/ssh.config"
 
 JENKINS_INSTALL="$ROOT/ansible/jenkins/playbooks/jenkins_install.yml"

@@ -1,0 +1,29 @@
+ds:
+  db:
+    host: "db"
+    port: 5432
+    name: "demo_db"
+    user: "demo"
+    pass: "demo"
+
+  backend:
+    host: "backend"
+    port: 8080
+
+  mailhog:
+    host: "backend"
+    smtp_port: 1025
+    ui_port: 8025
+
+  minio:
+    host: "backend"
+    port: 9000
+    console_port: 9001
+
+  front:
+    host: "front"
+    http_port: 80
+
+# αυτό θα αλλάζει ανά env (vagrant vs azure)
+public:
+  base_url: "http://front"   # σε vagrant internal

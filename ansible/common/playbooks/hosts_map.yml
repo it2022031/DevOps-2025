@@ -1,0 +1,15 @@
+- name: Ensure DS2025 hostnames resolve
+  hosts: all
+  become: true
+  tasks:
+    - name: Add DS2025 entries to /etc/hosts
+      blockinfile:
+        path: /etc/hosts
+        marker: "# {mark} DS2025"
+        block: |
+          {{ hostvars['backend'].ansible_host }} backend
+          {{ hostvars['db'].ansible_host }} db
+          {{ hostvars['front'].ansible_host }} front
+          {% if 'dockerhost' in groups %}{{ hostvars['dockerhost'].ansible_host }} dockerhost{% endif %}
+          {% if 'k8shost' in groups %}{{ hostvars['k8shost'].ansible_host }} k8shost{% endif %}
+          {% if 'jenkins' in groups %}{{ hostvars['jenkins'].ansible_host }} jenkins{% endif %}

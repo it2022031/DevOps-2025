@@ -7,7 +7,7 @@
     env_dir: /opt/DS-2025/backend
     env_file: /opt/DS-2025/backend/app.env
 
-    db_host: "{{ hostvars['db'].db_private_ip | default(hostvars['db'].ansible_host) }}"
+    db_host: db
     db_port: 5432
     db_name: demo_db
     db_user: demo_user
@@ -15,15 +15,15 @@
 
     spring_profile: prod
 
-    mail_host: 127.0.0.1
+    mail_host: backend
     mail_port: 1025
 
-    minio_endpoint: "http://127.0.0.1:9000"
+    minio_endpoint: "http://backend:9000"
     minio_access_key: minioadmin
     minio_secret_key: minioadmin123
 
     app_public_base_url: "http://127.0.0.1:8090"
-    cors_allowed_origins: "http://127.0.0.1:8090,http://localhost:8090"
+    cors_allowed_origins: "http://front,http://localhost:8090,http://127.0.0.1:8090"
 
   tasks:
     - name: Ensure backend env directory exists

@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT="$(git rev-parse --show-toplevel)"
 
 VAGRANT_DIR="$ROOT/infra/vagrant"
-INV="$ROOT/infra/inventories/hosts.ini"           # <- local inventory
+INV="$ROOT/infra/inventories/vagrant_local.ini"           # <- local inventory
 PLAYBOOK="$ROOT/ansible/vms/playbooks/site.yml"
 SSHCFG="$ROOT/infra/ssh/ssh.config"
 
