@@ -22,6 +22,11 @@
     api_upstream_port: 8080
 
   tasks:
+    - name: Disable default nginx site (remove symlink)
+      file:
+        path: /etc/nginx/sites-enabled/default
+        state: absent
+
     - name: Deploy nginx site config from template
       template:
         src: ../templates/nginx_site.conf.j2
