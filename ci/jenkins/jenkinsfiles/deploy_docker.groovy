@@ -1,28 +1,21 @@
 pipeline {
     agent any
-
-    options {
-        timestamps()
-    }
+    options { timestamps() }
 
     environment {
         ANSIBLE_HOST_KEY_CHECKING = "False"
     }
 
     stages {
-
         stage('Checkout') {
-            steps {
-                checkout scm
-            }
+            steps { checkout scm }
         }
 
         stage('Ping dockerhost') {
             steps {
                 sh '''
           set -e
-          cd vm/vagrant
-          ansible -i hosts_jenkins.ini docker -m ping
+          ansible -i infra/inventories/jenkins.ini docker_nodes -m ping
         '''
             }
         }
@@ -31,19 +24,14 @@ pipeline {
             steps {
                 sh '''
           set -e
-          cd vm/vagrant
-          ansible-playbook -i hosts_jenkins.ini docker/playbooks/site_docker_jenkins.yml
+          ansible-playbook -i infra/inventories/jenkins.ini ansible/docker/playbooks/site_docker_jenkins.yml --limit docker_nodes
         '''
             }
         }
     }
 
     post {
-        success {
-            echo '✅ Docker deployment completed successfully'
-        }
-        failure {
-            echo '❌ Docker deployment failed – check logs'
-        }
+        success { echo '✅ Docker deployment completed successfully' }
+        failure { echo '❌ Docker deployment failed – check logs' }
     }
 }
