@@ -2,6 +2,8 @@
 # 0) Host preflight (optional αλλά καλό)
 - import_playbook: preflight_host.yml
 
+- import_playbook: ../../common/playbooks/hosts_map.yml
+
 # 1) Common prep on all VMs
 - name: Common prep on all VMs
   hosts: vms

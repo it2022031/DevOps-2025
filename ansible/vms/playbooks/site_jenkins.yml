@@ -13,6 +13,8 @@
         state: directory
         mode: "1777"
 
+- import_playbook: ../../common/playbooks/hosts_map.yml
+
 # 2) Database
 - import_playbook: postgres.yml
 
