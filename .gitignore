@@ -27,3 +27,10 @@ vm/vagrant/ssh.config
 
 # OS junk
 .DS_Store
+
+# local backups
+*.bak
+*.bak_*
+*.bak.*
+*.swp
+*.tmp

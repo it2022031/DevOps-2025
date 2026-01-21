@@ -44,43 +44,22 @@
       notify: restart postgres
 
     - name: Apply pending handler actions now
-      meta: flush_handlers  - name: Create PostgreSQL user (psql safe)
-    become: true
-    shell: |
-      set -e
-      sudo -u postgres psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='{{ db_user }}'" | grep -q 1 \
-        || sudo -u postgres psql -c "CREATE USER {{ db_user }} WITH PASSWORD '{{ db_pass }}';"
+  meta: flush_handlers
 
-  - name: Create PostgreSQL database (psql safe)
-    become: true
-    shell: |
-      set -e
-      sudo -u postgres psql -tAc "SELECT 1 FROM pg_database WHERE datname='{{ db_name }}'" | grep -q 1 \
-        || sudo -u postgres psql -c "CREATE DATABASE {{ db_name }} OWNER {{ db_user }};"
+- name: Create PostgreSQL user (psql safe)
+  become: true
+  shell: |
+    set -e
+    sudo -u postgres psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='{{ db_user }}'" | grep -q 1       || sudo -u postgres psql -c "CREATE USER {{ db_user }} WITH PASSWORD '{{ db_pass }}';"
 
-  - name: Ensure privileges (psql safe)
-    become: true
-    shell: |
-      set -e
-      sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE {{ db_name }} TO {{ db_user }};"
-    - name: Wait for PostgreSQL to listen on 5432
-      wait_for:
-        host: "127.0.0.1"
-        port: 5432
-        state: started
-        timeout: 20
+- name: Create PostgreSQL database (psql safe)
+  become: true
+  shell: |
+    set -e
+    sudo -u postgres psql -tAc "SELECT 1 FROM pg_database WHERE datname='{{ db_name }}'" | grep -q 1       || sudo -u postgres psql -c "CREATE DATABASE {{ db_name }} OWNER {{ db_user }};"
 
-    - name: Verify PostgreSQL is listening on TCP 5432
-      shell: "ss -lntp | grep ':5432' || true"
-      register: pg_listen_check
-      changed_when: false
-
-    - name: Show listening check
-      debug:
-        var: pg_listen_check.stdout_lines
-
-  handlers:
-    - name: restart postgres
-      service:
-        name: postgresql
-        state: restarted
+- name: Ensure privileges (psql safe)
+  become: true
+  shell: |
+    set -e
+    sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE {{ db_name }} TO {{ db_user }};"
