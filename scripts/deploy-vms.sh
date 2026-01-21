@@ -8,6 +8,13 @@ INV="$ROOT/infra/inventories/hosts.ini"
 PLAYBOOK="$ROOT/ansible/vms/playbooks/site.yml"
 SSHCFG="$ROOT/infra/ssh/ssh.config"
 
+# ✅ Use the same Ansible config Jenkins should use
+export ANSIBLE_CONFIG="$ROOT/infra/ansible/ansible-jenkins.cfg"
+# ✅ Safety: force remote tmp used by Ansible on targets
+export ANSIBLE_REMOTE_TEMP="/tmp/.ansible-jenkins/tmp"
+# (Optional) reduce noise
+export ANSIBLE_HOST_KEY_CHECKING="False"
+
 mkdir -p "$ROOT/infra/ssh"
 
 TARGETS=(backend db front)
@@ -19,7 +26,9 @@ cd "$VAGRANT_DIR"
 need_up=0
 for m in "${TARGETS[@]}"; do
   state="$(vagrant status "$m" --machine-readable | awk -F, '$3=="state" {print $4}' | tail -n1 || true)"
-  if [ "$state" != "running" ]; then need_up=1; fi
+  if [ "$state" != "running" ]; then
+    need_up=1
+  fi
 done
 
 if [ "$need_up" -eq 1 ]; then
@@ -35,8 +44,15 @@ vagrant ssh-config "${TARGETS[@]}" > "$SSHCFG"
 # 2) Ansible should run from repo root so relative paths in inventory work
 cd "$ROOT"
 
+echo "ℹ️ Using ANSIBLE_CONFIG=$ANSIBLE_CONFIG"
+ansible --version | head -n 5
+
 echo "🧪 Ansible ping (targets only)..."
 ansible -i "$INV" "$TARGET_PATTERN" -m ping
+
+# ✅ Ensure remote tmp exists on targets (prevents tmp/become issues)
+echo "🧰 Ensure remote tmp exists on targets..."
+ansible -i "$INV" "$TARGET_PATTERN" -b -m file -a "path=$ANSIBLE_REMOTE_TEMP state=directory mode=1777"
 
 echo "🚀 Deploy (targets only)..."
 ansible-playbook -i "$INV" "$PLAYBOOK" --limit "$TARGET_PATTERN"
