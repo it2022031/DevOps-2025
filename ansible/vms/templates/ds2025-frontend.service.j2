@@ -8,7 +8,9 @@ Type=simple
 User={{ run_user }}
 WorkingDirectory={{ frontend_dir }}
 
-ExecStart=/bin/bash -lc 'export NVM_DIR="$HOME/.nvm"; . "$NVM_DIR/nvm.sh"; nvm use default; cd "{{ frontend_dir }}"; npx --yes serve -s dist -l {{ front_port }}'
+Environment=NODE_ENV=production
+ExecStart=/bin/bash -lc 'export NVM_DIR="$HOME/.nvm"; [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"; nvm use default >/dev/null 2>&1 || true; cd "{{ frontend_dir }}"; npx --yes serve -s dist -l {{ front_port }}'
+
 Restart=always
 RestartSec=3
 SuccessExitStatus=143

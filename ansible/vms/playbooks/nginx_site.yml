@@ -4,9 +4,11 @@
   become: true
 
   vars:
+    # Defaults (override these from site.yml when calling this playbook)
     nginx_site: ds2025
     listen_port: 80
 
+    # Upstream for "/" (usually local service)
     upstream_host: 127.0.0.1
     upstream_port: 8080
 
@@ -15,8 +17,9 @@
     # Optional API proxy (useful for FRONT)
     enable_api_proxy: false
     api_prefix: "/api/"
-    api_upstream_host: "10.10.10.11"
-    api_upstream_port: 80
+    # ✅ default: backend host from inventory (no hardcoded IP)
+    api_upstream_host: "{{ hostvars['backend'].ansible_host | default('127.0.0.1') }}"
+    api_upstream_port: 8080
 
   tasks:
     - name: Deploy nginx site config from template
@@ -24,6 +27,19 @@
         src: ../templates/nginx_site.conf.j2
         dest: "/etc/nginx/sites-available/{{ nginx_site }}"
         mode: "0644"
+      notify: restart nginx
+
+    # ✅ avoid: "refusing to convert from file to symlink"
+    - name: Remove existing sites-enabled entry if present
+      file:
+        path: "/etc/nginx/sites-enabled/{{ nginx_site }}"
+        state: absent
+
+    - name: Enable site (symlink)
+      file:
+        src: "/etc/nginx/sites-available/{{ nginx_site }}"
+        dest: "/etc/nginx/sites-enabled/{{ nginx_site }}"
+        state: link
       notify: restart nginx
 
     - name: Validate nginx configuration

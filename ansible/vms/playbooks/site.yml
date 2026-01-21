@@ -1,10 +1,4 @@
 ---
-#- name: Ensure ansible remote tmp exists
-#  file:
-#    path: /tmp/.ansible-jenkins/tmp
-#    state: directory
-#    mode: "1777"
-#  become: true
 # 0) Host preflight (optional αλλά καλό)
 - import_playbook: preflight_host.yml
 
@@ -52,11 +46,6 @@
     upstream_port: 8080
     enable_api_proxy: false
 
-- import_playbook: nginx_enable_site.yml
-  vars:
-    target_hosts: backend
-    nginx_site: ds2025
-
 - import_playbook: nginx_restart.yml
   vars:
     target_hosts: backend
@@ -75,7 +64,6 @@
 - import_playbook: frontend_build.yml
 - import_playbook: frontend_service.yml
 
-
 # 9) Front Nginx (proxy :80 -> :8081, and /api -> backend:8080)
 - import_playbook: nginx_install.yml
   vars:
@@ -89,13 +77,8 @@
     upstream_port: 8081
     enable_api_proxy: true
     api_prefix: "/api/"
-    api_upstream_host: 10.10.10.11
+    api_upstream_host: "{{ hostvars['backend'].ansible_host }}"
     api_upstream_port: 8080
-
-- import_playbook: nginx_enable_site.yml
-  vars:
-    target_hosts: front
-    nginx_site: ds2025-front
 
 - import_playbook: nginx_restart.yml
   vars:
