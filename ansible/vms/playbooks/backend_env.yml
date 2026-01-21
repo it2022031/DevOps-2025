@@ -15,21 +15,19 @@
 
     spring_profile: prod
 
-    # MailHog runs on backend VM (same host) -> use localhost
+    # MailHog runs on backend VM (same host)
     mail_host: 127.0.0.1
     mail_port: 1025
 
-    # MinIO runs on backend VM (same host) -> use localhost
+    # MinIO runs on backend VM (same host)
     minio_endpoint: "http://127.0.0.1:9000"
     minio_access_key: minioadmin
     minio_secret_key: minioadmin123
 
-    # ✅ Public URL used in activation emails AND redirect target
-    # (this is where your browser opens the UI)
+    # ✅ Public URL (frontend – what the user opens in browser)
     app_public_base_url: "http://127.0.0.1:8090"
 
-    # ✅ CORS: allow the frontend origin(s)
-    # Spring will map env var CORS_ALLOWED_ORIGINS -> property cors.allowed-origins
+    # ✅ CORS: frontend origins allowed to call backend
     cors_allowed_origins: "http://127.0.0.1:8090,http://localhost:8090"
 
   tasks:
@@ -48,12 +46,15 @@
         group: root
         mode: "0640"
         content: |
+          # Spring profile
           SPRING_PROFILES_ACTIVE={{ spring_profile }}
+
+          # Database
           SPRING_DATASOURCE_URL=jdbc:postgresql://{{ db_host }}:{{ db_port }}/{{ db_name }}
           SPRING_DATASOURCE_USERNAME={{ db_user }}
           SPRING_DATASOURCE_PASSWORD={{ db_pass }}
 
-          # CORS (must match frontend origin)
+          # CORS (frontend origins)
           CORS_ALLOWED_ORIGINS={{ cors_allowed_origins }}
 
           # MailHog (SMTP)
@@ -65,12 +66,19 @@
           MINIO_ACCESS_KEY={{ minio_access_key }}
           MINIO_SECRET_KEY={{ minio_secret_key }}
 
-          # ✅ Activation link base URL (used by EmailService)
+          # Activation links in emails
           APP_PUBLIC_BASE_URL={{ app_public_base_url }}
 
-          # ✅ Redirect target (used by AuthController)
+          # Redirect target after activation
           APP_FRONTEND_URL={{ app_public_base_url }}
+      notify: restart backend
 
     - name: Show env file location
       debug:
         msg: "Backend env file written at {{ env_file }}"
+
+  handlers:
+    - name: restart backend
+      service:
+        name: ds2025-backend
+        state: restarted
