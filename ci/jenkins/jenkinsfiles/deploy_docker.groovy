@@ -15,7 +15,7 @@ pipeline {
             steps {
                 sh '''
           set -e
-          ansible -i infra/inventories/jenkins.ini docker_nodes -m ping
+          ansible -i infra/inventories/hosts_jenkins.ini docker_nodes -m ping
         '''
             }
         }
@@ -24,7 +24,7 @@ pipeline {
             steps {
                 sh '''
           set -e
-          ansible-playbook -i infra/inventories/jenkins.ini ansible/docker/playbooks/site_docker_jenkins.yml --limit docker_nodes
+          ansible-playbook -i infra/inventories/hosts_jenkins.ini ansible/docker/playbooks/site_docker_jenkins.yml --limit docker_nodes
         '''
             }
         }
