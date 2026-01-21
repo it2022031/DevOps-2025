@@ -65,9 +65,9 @@ spec:
 
             # Public base for activation links (θα το αλλάξουμε όταν βάλουμε Ingress/FQDN)
             - name: APP_PUBLIC_BASE_URL
-              value: "http://frontend"
+              value: "http://127.0.0.1:8082"
             - name: APP_FRONTEND_URL
-              value: "http://frontend"
+              value: "http://127.0.0.1:8082"
             - name: CORS_ALLOWED_ORIGINS
-              value: http://frontend,http://frontend
+              value: "http://127.0.0.1,http://localhost,http://127.0.0.1:8082,http://localhost:8082"
 
