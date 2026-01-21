@@ -59,7 +59,7 @@
         host: 127.0.0.1
         port: 8080
         state: started
-        timeout: 45
+        timeout: 120
 
     - name: Check backend HTTP response
       uri:

@@ -8,6 +8,6 @@
         path: /etc/hosts
         marker: "# {mark} DS2025"
         block: |
-          {{ hostvars['backend'].private_ip }} backend
-          {{ hostvars['db'].private_ip }} db
-          {{ hostvars['front'].private_ip }} front
+          {{ (hostvars['backend'].private_ip | default(hostvars['backend'].ansible_host)) }} backend
+          {{ (hostvars['db'].private_ip | default(hostvars['db'].ansible_host)) }} db
+          {{ (hostvars['front'].private_ip | default(hostvars['front'].ansible_host)) }} front
