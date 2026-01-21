@@ -24,8 +24,8 @@
   hosts: backend
   become: true
   vars:
-    # safe: prefer ip var, else fallback to known IP
-    db_host: "{{ hostvars['dbvm'].ip | default('10.10.10.12') }}"
+    # ✅ Use the DB host from inventory (and prefer db_private_ip if you set it)
+    db_host: "{{ hostvars['db'].db_private_ip | default(hostvars['db'].ansible_host) }}"
     db_port: 5432
   tasks:
     - name: Ensure netcat exists
@@ -36,7 +36,7 @@
         cache_valid_time: 3600
 
     - name: Check TCP connectivity to DB
-      shell: "nc -vz {{ db_host }} {{ db_port }}"
+      shell: "nc -vz -w 2 {{ db_host }} {{ db_port }}"
       register: nc_db
       changed_when: false
       retries: 10
