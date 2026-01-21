@@ -7,15 +7,13 @@ pipeline {
     }
 
     stages {
-        stage('Checkout') {
-            steps { checkout scm }
-        }
+        stage('Checkout') { steps { checkout scm } }
 
         stage('Ping') {
             steps {
                 sh '''
           set -e
-          ansible -i infra/inventories/hosts.ini all -m ping
+          ansible -i infra/inventories/hosts_jenkins.ini all -m ping
         '''
             }
         }
@@ -24,7 +22,7 @@ pipeline {
             steps {
                 sh '''
           set -e
-          ansible-playbook -i infra/inventories/hosts.ini ansible/vms/playbooks/site.yml --limit vms
+          ansible-playbook -i infra/inventories/hosts_jenkins.ini ansible/vms/playbooks/site.yml --limit vms
         '''
             }
         }
@@ -33,7 +31,7 @@ pipeline {
             steps {
                 sh '''
           set -e
-          ansible-playbook -i infra/inventories/hosts.ini ansible/vms/playbooks/healthcheck.yml --limit vms
+          ansible-playbook -i infra/inventories/hosts_jenkins.ini ansible/vms/playbooks/healthcheck.yml --limit vms
         '''
             }
         }
