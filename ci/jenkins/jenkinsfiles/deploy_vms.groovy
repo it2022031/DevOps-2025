@@ -1,9 +1,6 @@
 pipeline {
     agent any
-
-    options {
-        timestamps()
-    }
+    options { timestamps() }
 
     environment {
         ANSIBLE_HOST_KEY_CHECKING = "False"
@@ -11,27 +8,23 @@ pipeline {
 
     stages {
         stage('Checkout') {
-            steps {
-                checkout scm
-            }
+            steps { checkout scm }
         }
 
         stage('Ping') {
             steps {
                 sh '''
           set -e
-          cd vm/vagrant
-          ansible -i hosts_jenkins.ini all -m ping
+          ansible -i infra/inventories/hosts.ini all -m ping
         '''
             }
         }
 
-        stage('Deploy VMs (site_jenkins.yml)') {
+        stage('Deploy VMs') {
             steps {
                 sh '''
           set -e
-          cd vm/vagrant
-          ansible-playbook -i hosts_jenkins.ini playbooks/site_jenkins.yml
+          ansible-playbook -i infra/inventories/hosts.ini ansible/vms/playbooks/site.yml --limit vms
         '''
             }
         }
@@ -40,8 +33,7 @@ pipeline {
             steps {
                 sh '''
           set -e
-          cd vm/vagrant
-          ansible-playbook -i hosts_jenkins.ini playbooks/healthcheck.yml
+          ansible-playbook -i infra/inventories/hosts.ini ansible/vms/playbooks/healthcheck.yml --limit vms
         '''
             }
         }

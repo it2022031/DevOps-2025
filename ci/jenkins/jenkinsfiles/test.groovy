@@ -1,14 +1,22 @@
 pipeline {
     agent any
+    options { timestamps() }
+
+    environment {
+        ANSIBLE_HOST_KEY_CHECKING = "False"
+    }
+
     stages {
-        stage('Checkout') { steps { checkout scm } }
+        stage('Checkout') {
+            steps { checkout scm }
+        }
+
         stage('Ping') {
             steps {
                 sh '''
-                  cd vm/vagrant
-                  export ANSIBLE_HOST_KEY_CHECKING=False
-                  ansible -i hosts_jenkins.ini all -m ping
-                '''
+          set -e
+          ansible -i infra/inventories/hosts.ini all -m ping
+        '''
             }
         }
     }

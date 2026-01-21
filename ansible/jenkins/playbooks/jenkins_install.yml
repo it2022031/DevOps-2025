@@ -4,14 +4,14 @@
   become: true
 
   tasks:
-    - name: Install base prerequisites + Java 21
+    - name: Install base prerequisites + Java 21 + Ansible
       apt:
         name:
-          - ca-certificates
-          - curl
-          - gnupg
           - git
-          - openjdk-21-jdk
+          - curl
+          - ca-certificates
+          - ansible
+          - openjdk-21-jre-headless
         state: present
         update_cache: yes
         cache_valid_time: 3600
