@@ -1,10 +1,10 @@
 ---
-- name: Ensure ansible remote tmp exists
-  file:
-    path: /tmp/.ansible-jenkins/tmp
-    state: directory
-    mode: "1777"
-  become: true
+#- name: Ensure ansible remote tmp exists
+#  file:
+#    path: /tmp/.ansible-jenkins/tmp
+#    state: directory
+#    mode: "1777"
+#  become: true
 # 0) Host preflight (optional αλλά καλό)
 - import_playbook: preflight_host.yml
 
@@ -13,9 +13,9 @@
   hosts: vms
   become: true
   tasks:
-    - name: Ensure remote tmp dir exists
+    - name: Ensure ansible remote tmp exists
       file:
-        path: "/tmp/.ansible-{{ lookup('env','USER') | default('ansible') }}"
+        path: /tmp/.ansible-jenkins/tmp
         state: directory
         mode: "1777"
 
