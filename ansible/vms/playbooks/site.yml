@@ -1,4 +1,10 @@
 ---
+- name: Ensure ansible remote tmp exists
+  file:
+    path: /tmp/.ansible-jenkins/tmp
+    state: directory
+    mode: "1777"
+  become: true
 # 0) Host preflight (optional αλλά καλό)
 - import_playbook: preflight_host.yml
 
