@@ -1,0 +1,63 @@
+---
+# 1) First deploy the docker stack using your existing playbook (top-level import)
+- import_playbook: ../../../docker/playbooks/docker_site.yml
+
+# 2) Then add HTTPS reverse proxy on the SAME VM
+- name: ONLINE Docker deploy (HTTPS via Nginx+Certbot)
+  hosts: docker_nodes
+  become: true
+
+  vars:
+    public_fqdn: "ds2025.example.com"       # <-- βάλε το δικό σου
+    letsencrypt_email: "you@example.com"    # <-- βάλε το δικό σου
+    nginx_site: "ds2025-online"
+
+  tasks:
+    - name: Install nginx + certbot
+      apt:
+        name: [nginx, certbot, python3-certbot-nginx]
+        state: present
+        update_cache: yes
+
+    - name: Create webroot for certbot
+      file:
+        path: /var/www/certbot
+        state: directory
+        mode: "0755"
+
+    - name: Write nginx vhost (HTTP)
+      template:
+        src: ../../nginx/templates/ds2025_docker.conf.j2
+        dest: "/etc/nginx/sites-available/{{ nginx_site }}"
+        mode: "0644"
+
+    - name: Enable nginx site
+      file:
+        src: "/etc/nginx/sites-available/{{ nginx_site }}"
+        dest: "/etc/nginx/sites-enabled/{{ nginx_site }}"
+        state: link
+
+    - name: Disable default site
+      file:
+        path: /etc/nginx/sites-enabled/default
+        state: absent
+
+    - name: Validate nginx config
+      command: nginx -t
+      changed_when: false
+
+    - name: Restart nginx
+      service:
+        name: nginx
+        state: restarted
+        enabled: yes
+
+    - name: Obtain/renew LetsEncrypt cert
+      command: >
+        certbot --nginx -n
+        --agree-tos
+        -m {{ letsencrypt_email }}
+        -d {{ public_fqdn }}
+      register: certbot_out
+      changed_when: "'Congratulations' in certbot_out.stdout or 'renewed' in certbot_out.stdout"
+      failed_when: certbot_out.rc != 0 and ('not yet due' not in certbot_out.stdout|lower)

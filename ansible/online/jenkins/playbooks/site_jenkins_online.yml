@@ -1,0 +1,57 @@
+---
+- name: Bootstrap Jenkins online (SSH key + authorize to all targets)
+  hosts: jenkins_nodes
+  become: true
+
+  vars:
+    jenkins_user: jenkins
+    key_path: "/var/lib/jenkins/.ssh/jenkins_id"
+
+  tasks:
+    - name: Ensure packages for Jenkins node (git, curl, ssh tools)
+      apt:
+        name: [git, curl, openssh-client]
+        state: present
+        update_cache: yes
+
+    - name: Ensure jenkins .ssh exists
+      file:
+        path: "/var/lib/jenkins/.ssh"
+        state: directory
+        owner: "{{ jenkins_user }}"
+        group: "{{ jenkins_user }}"
+        mode: "0700"
+
+    - name: Generate SSH keypair for Jenkins if missing
+      become_user: "{{ jenkins_user }}"
+      command: "ssh-keygen -t ed25519 -f {{ key_path }} -N ''"
+      args:
+        creates: "{{ key_path }}"
+
+    - name: Read Jenkins public key
+      slurp:
+        src: "{{ key_path }}.pub"
+      register: jpub
+
+    - name: Set Jenkins public key fact
+      set_fact:
+        jenkins_pubkey: "{{ jpub.content | b64decode | trim }}"
+
+- name: Authorize Jenkins key on all targets (cloud)
+  hosts: backend,db,front,docker_nodes,k8s_nodes
+  become: true
+
+  tasks:
+    - name: Ensure ~/.ssh exists for remote user
+      file:
+        path: "/home/{{ ansible_user }}/.ssh"
+        state: directory
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: "0700"
+
+    - name: Authorize Jenkins key for remote user
+      authorized_key:
+        user: "{{ ansible_user }}"
+        key: "{{ hostvars['jenkins'].jenkins_pubkey }}"
+        state: present

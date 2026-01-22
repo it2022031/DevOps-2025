@@ -1,0 +1,92 @@
+---
+- name: Deploy DS-2025 Docker stack on cloud VM + HTTPS (Caddy)
+  hosts: docker_nodes
+  become: true
+
+  vars:
+    # Repo
+    repo_url: "https://github.com/it2022031/DevOps-2025.git"
+    project_dir: /opt/DevOps-2025
+
+    # Public URL (FQDN)
+    public_fqdn: "ds2025.example.com"   # <-- άλλαξέ το
+
+    # GHCR login (αν χρειάζεται για private images)
+    ghcr_username: ""   # <-- βάλε το ή άστο κενό
+    ghcr_token: ""      # <-- βάλε token ή άστο κενό
+
+    # Compose directory (εκεί που έχεις docker-compose.yml)
+    compose_dir: "{{ project_dir }}/ansible/docker"
+
+  tasks:
+    - name: Install git + curl
+      apt:
+        name: [git, curl]
+        state: present
+        update_cache: yes
+
+    - name: Install Docker (reuse existing playbook logic if you want)
+      import_playbook: ../../../docker/playbooks/install_docker.yml
+
+    - name: Clone/update repo
+      git:
+        repo: "{{ repo_url }}"
+        dest: "{{ project_dir }}"
+        version: main
+        force: yes
+
+    - name: Ensure docker compose plugin or docker-compose exists
+      shell: |
+        set -e
+        docker compose version >/dev/null 2>&1 && exit 0
+        docker-compose version >/dev/null 2>&1 && exit 0
+        echo "No docker compose found"
+        exit 1
+      changed_when: false
+
+    - name: Login to GHCR (optional)
+      when: ghcr_username|length > 0 and ghcr_token|length > 0
+      shell: |
+        set -e
+        echo "{{ ghcr_token }}" | docker login ghcr.io -u "{{ ghcr_username }}" --password-stdin
+      changed_when: false
+
+    - name: Compose pull (best effort)
+      shell: |
+        set -e
+        cd "{{ compose_dir }}"
+        (docker compose pull || docker-compose pull) || true
+      changed_when: false
+
+    - name: Compose up (NO BUILD)
+      shell: |
+        set -e
+        cd "{{ compose_dir }}"
+        (docker compose up -d || docker-compose up -d)
+      changed_when: true
+
+    # --- HTTPS reverse proxy (Caddy) ---
+    - name: Install Caddy
+      apt:
+        name: caddy
+        state: present
+        update_cache: yes
+
+    - name: Deploy Caddyfile
+      template:
+        src: ../../docker/files/Caddyfile.j2
+        dest: /etc/caddy/Caddyfile
+        mode: "0644"
+      notify: restart caddy
+
+    - name: Ensure Caddy is enabled and running
+      service:
+        name: caddy
+        state: started
+        enabled: yes
+
+  handlers:
+    - name: restart caddy
+      service:
+        name: caddy
+        state: restarted

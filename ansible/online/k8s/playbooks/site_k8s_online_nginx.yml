@@ -1,0 +1,76 @@
+---
+# 1) Existing MicroK8s install + apply core (top-level imports)
+- import_playbook: ../../k8s/playbooks/microk8s_install.yml
+- import_playbook: ../../k8s/playbooks/k8s_apply_core.yml
+
+# 2) Online-only steps
+- name: ONLINE K8s deploy (HTTPS via host Nginx+Certbot -> MicroK8s ingress)
+  hosts: k8s_nodes
+  become: true
+
+  vars:
+    public_fqdn: "ds2025.example.com"       # <-- βάλε το δικό σου
+    letsencrypt_email: "you@example.com"    # <-- βάλε το δικό σου
+    nginx_site: "ds2025-k8s-online"
+    public_base_url: "https://{{ public_fqdn }}"
+
+  tasks:
+    - name: Set backend public URLs + CORS for online
+      shell: |
+        set -e
+        microk8s kubectl -n ds2025 set env deploy/backend \
+          APP_PUBLIC_BASE_URL="{{ public_base_url }}" \
+          APP_FRONTEND_URL="{{ public_base_url }}" \
+          CORS_ALLOWED_ORIGINS="{{ public_base_url }},http://{{ public_fqdn }}"
+        microk8s kubectl -n ds2025 rollout restart deploy/backend
+        microk8s kubectl -n ds2025 rollout status deploy/backend --timeout=180s
+      changed_when: true
+
+    - name: Install nginx + certbot
+      apt:
+        name: [nginx, certbot, python3-certbot-nginx]
+        state: present
+        update_cache: yes
+
+    - name: Create webroot for certbot
+      file:
+        path: /var/www/certbot
+        state: directory
+        mode: "0755"
+
+    - name: Write nginx vhost (HTTP -> proxy to ingress)
+      template:
+        src: ../../nginx/templates/ds2025_k8s.conf.j2
+        dest: "/etc/nginx/sites-available/{{ nginx_site }}"
+        mode: "0644"
+
+    - name: Enable nginx site
+      file:
+        src: "/etc/nginx/sites-available/{{ nginx_site }}"
+        dest: "/etc/nginx/sites-enabled/{{ nginx_site }}"
+        state: link
+
+    - name: Disable default site
+      file:
+        path: /etc/nginx/sites-enabled/default
+        state: absent
+
+    - name: Validate nginx config
+      command: nginx -t
+      changed_when: false
+
+    - name: Restart nginx
+      service:
+        name: nginx
+        state: restarted
+        enabled: yes
+
+    - name: Obtain/renew LetsEncrypt cert
+      command: >
+        certbot --nginx -n
+        --agree-tos
+        -m {{ letsencrypt_email }}
+        -d {{ public_fqdn }}
+      register: certbot_out
+      changed_when: "'Congratulations' in certbot_out.stdout or 'renewed' in certbot_out.stdout"
+      failed_when: certbot_out.rc != 0 and ('not yet due' not in certbot_out.stdout|lower)

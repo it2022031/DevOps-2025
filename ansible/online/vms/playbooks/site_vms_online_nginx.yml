@@ -1,0 +1,123 @@
+---
+- name: ONLINE VMs deploy (backend/db/front) + HTTPS on front via Nginx/Certbot
+  hosts: vms
+  become: true
+
+  vars:
+    public_fqdn: "ds2025.example.com"       # <-- βάλε το δικό σου
+    letsencrypt_email: "you@example.com"    # <-- βάλε το δικό σου
+    public_base_url: "https://{{ public_fqdn }}"
+    nginx_site_online: "ds2025-online"
+
+  tasks:
+    # 1) Deploy the stack using your existing Jenkins-safe VM playbook (works with cloud inventory too)
+    - name: Deploy DS2025 stack on VMs (reuse existing)
+      import_playbook: ../../../vms/playbooks/site_jenkins.yml
+
+    # 2) Update backend public url + cors (so activation links are correct)
+    - name: Set backend public URL + CORS for online
+      when: inventory_hostname == 'backend'
+      block:
+        - name: Patch backend env file for online (APP_PUBLIC_BASE_URL + CORS)
+          lineinfile:
+            path: /opt/DS-2025/backend/app.env
+            regexp: '^APP_PUBLIC_BASE_URL='
+            line: "APP_PUBLIC_BASE_URL={{ public_base_url }}"
+
+        - name: Patch backend env file for online (APP_FRONTEND_URL)
+          lineinfile:
+            path: /opt/DS-2025/backend/app.env
+            regexp: '^APP_FRONTEND_URL='
+            line: "APP_FRONTEND_URL={{ public_base_url }}"
+
+        - name: Patch backend env file for online (CORS_ALLOWED_ORIGINS)
+          lineinfile:
+            path: /opt/DS-2025/backend/app.env
+            regexp: '^CORS_ALLOWED_ORIGINS='
+            line: "CORS_ALLOWED_ORIGINS={{ public_base_url }},http://{{ public_fqdn }}"
+
+        - name: Restart backend
+          service:
+            name: ds2025-backend
+            state: restarted
+
+    # 3) Install nginx+certbot ONLY on front (TLS terminator)
+    - name: Install nginx + certbot on front
+      when: inventory_hostname == 'front'
+      block:
+        - name: Install nginx + certbot
+          apt:
+            name: [nginx, certbot, python3-certbot-nginx]
+            state: present
+            update_cache: yes
+
+        - name: Create webroot for certbot
+          file:
+            path: /var/www/certbot
+            state: directory
+            mode: "0755"
+
+        # Write an online-specific nginx site (HTTP first)
+        - name: Write nginx online vhost (HTTP)
+          copy:
+            dest: "/etc/nginx/sites-available/{{ nginx_site_online }}"
+            mode: "0644"
+            content: |
+              server {
+                listen 80;
+                server_name {{ public_fqdn }};
+
+                location /.well-known/acme-challenge/ {
+                  root /var/www/certbot;
+                }
+
+                location / {
+                  proxy_pass http://127.0.0.1:8081;
+                  proxy_http_version 1.1;
+                  proxy_set_header Host $host;
+                  proxy_set_header X-Real-IP $remote_addr;
+                  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                  proxy_set_header X-Forwarded-Proto $scheme;
+                }
+
+                location /api/ {
+                  proxy_pass http://{{ hostvars['backend'].ansible_host }}:8080;
+                  proxy_http_version 1.1;
+                  proxy_set_header Host $host;
+                  proxy_set_header X-Real-IP $remote_addr;
+                  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                  proxy_set_header X-Forwarded-Proto $scheme;
+                }
+              }
+
+        - name: Enable nginx online site
+          file:
+            src: "/etc/nginx/sites-available/{{ nginx_site_online }}"
+            dest: "/etc/nginx/sites-enabled/{{ nginx_site_online }}"
+            state: link
+
+        - name: Disable default nginx site
+          file:
+            path: /etc/nginx/sites-enabled/default
+            state: absent
+
+        - name: Validate nginx config
+          command: nginx -t
+          changed_when: false
+
+        - name: Restart nginx
+          service:
+            name: nginx
+            state: restarted
+            enabled: yes
+
+        - name: Obtain/renew LetsEncrypt cert (nginx plugin)
+          command: >
+            certbot --nginx -n
+            --agree-tos
+            -m {{ letsencrypt_email }}
+            -d {{ public_fqdn }}
+          register: certbot_out
+          changed_when: "'Congratulations' in certbot_out.stdout or 'renewed' in certbot_out.stdout"
+
+  # end
