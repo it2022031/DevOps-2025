@@ -1,0 +1,10 @@
+---
+- name: Ensure Ansible remote tmp works for Jenkins runs
+  hosts: vms
+  gather_facts: false
+  tasks:
+    - name: Fix /tmp/.ansible-jenkins/tmp permissions (raw, no remote_tmp needed)
+      raw: |
+        sudo mkdir -p /tmp/.ansible-jenkins/tmp
+        sudo chmod 1777 /tmp/.ansible-jenkins /tmp/.ansible-jenkins/tmp
+        sudo chown -R vagrant:vagrant /tmp/.ansible-jenkins || true

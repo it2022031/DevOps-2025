@@ -3,6 +3,8 @@
 # Runs fully from Jenkins VM using hosts_jenkins.ini
 
 # 1) Common prep on all VMs (backend/db/front)
+- import_playbook: common/jenkins_remote_tmp_fix.yml
+
 - name: Common prep on all VMs
   hosts: vms
   become: true
