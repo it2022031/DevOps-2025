@@ -4,17 +4,33 @@
   become: true
 
   tasks:
+    # --- Precheck: Jenkins already running (skip install) ---
+    - name: Precheck Jenkins service active
+      shell: "systemctl is-active --quiet jenkins && echo active || echo inactive"
+      register: jenkins_active
+      changed_when: false
+
+    - name: Precheck Jenkins port 8080 listening
+      shell: "ss -lntp | grep -q ':8080' && echo listening || echo not_listening"
+      register: jenkins_listen
+      changed_when: false
+
+    - name: Skip install if Jenkins is already healthy
+      meta: end_play
+      when: jenkins_active.stdout.strip() == 'active' and jenkins_listen.stdout.strip() == 'listening'
+
+    # --- Install path (only when not healthy) ---
     - name: Install base prerequisites + Java 21 + Ansible
       apt:
         name:
-          - git
-          - curl
           - ca-certificates
+          - curl
+          - gnupg
+          - apt-transport-https
+          - openjdk-21-jre
           - ansible
-          - openjdk-21-jre-headless
         state: present
         update_cache: yes
-        cache_valid_time: 3600
 
     - name: Create keyrings directory
       file:
@@ -33,15 +49,18 @@
     - name: Add Jenkins apt repository
       copy:
         dest: /etc/apt/sources.list.d/jenkins.list
-        mode: "0644"
         content: |
           deb [signed-by=/etc/apt/keyrings/jenkins-keyring.asc] https://pkg.jenkins.io/debian-stable binary/
-      register: jenkins_repo
+        mode: "0644"
 
-    - name: apt update (only if repo changed)
-      apt:
-        update_cache: yes
-      when: jenkins_repo.changed
+    - name: apt update (best-effort retries)
+      shell: |
+        set -e
+        for i in 1 2 3 4 5; do
+          apt-get update && exit 0
+          sleep 3
+        done
+        exit 1
 
     - name: Install Jenkins
       apt:
@@ -58,29 +77,8 @@
       uri:
         url: "http://127.0.0.1:8080/login"
         status_code: 200
+        validate_certs: false
       register: jenkins_http
-      retries: 60
+      retries: 30
       delay: 2
       until: jenkins_http.status == 200
-
-    - name: Check if initialAdminPassword exists
-      stat:
-        path: /var/lib/jenkins/secrets/initialAdminPassword
-      register: initpw
-
-    - name: Read initial admin password (first-run only)
-      command: cat /var/lib/jenkins/secrets/initialAdminPassword
-      when: initpw.stat.exists
-      register: initpw_out
-      changed_when: false
-
-    - name: Show initial admin password (first-run only)
-      debug:
-        msg: "Initial admin password: {{ initpw_out.stdout }}"
-      when: initpw.stat.exists
-
-
-    - name: Show initial admin password (legacy)
-      debug:
-        msg: "{{ initpw_out.stdout }}"
-      when: initpw.stat.exists
