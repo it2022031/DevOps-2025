@@ -1,18 +1,54 @@
 ---
-# 1) First deploy the docker stack using your existing playbook (top-level import)
-- import_playbook: ../../../docker/playbooks/docker_site.yml
+# 1) Install Docker on docker_nodes using your existing playbook (TOP-LEVEL)
+- import_playbook: ../../../docker/playbooks/install_docker.yml
 
-# 2) Then add HTTPS reverse proxy on the SAME VM
-- name: ONLINE Docker deploy (HTTPS via Nginx+Certbot)
+# 2) Online deploy (clone repo -> docker compose up) + Nginx/Certbot
+- name: ONLINE Docker deploy (clone repo -> compose up) + HTTPS via Nginx/Certbot
   hosts: docker_nodes
   become: true
 
   vars:
-    public_fqdn: "ds2025.example.com"       # <-- βάλε το δικό σου
-    letsencrypt_email: "you@example.com"    # <-- βάλε το δικό σου
+    repo_url: "https://github.com/it2022031/DevOps-2025.git"
+    project_dir: /opt/DevOps-2025
+    compose_dir: "{{ project_dir }}/ansible/docker"
+
+    # ONLINE (βάλε τα σωστά όταν έχεις domain)
+    public_fqdn: "ds2025.example.com"
+    letsencrypt_email: "you@example.com"
     nginx_site: "ds2025-online"
 
   tasks:
+    - name: Install prerequisites
+      apt:
+        name: [git, curl, ca-certificates]
+        state: present
+        update_cache: yes
+
+    - name: Clone/update DevOps-2025 repo
+      git:
+        repo: "{{ repo_url }}"
+        dest: "{{ project_dir }}"
+        version: main
+        force: yes
+
+    - name: Ensure docker-compose.yml exists in repo
+      stat:
+        path: "{{ compose_dir }}/docker-compose.yml"
+      register: dc
+
+    - name: Fail if docker-compose.yml missing
+      fail:
+        msg: "Missing docker-compose.yml at {{ compose_dir }}/docker-compose.yml"
+      when: not dc.stat.exists
+
+    - name: Compose up (NO BUILD)
+      shell: |
+        set -e
+        cd "{{ compose_dir }}"
+        (docker compose up -d || docker-compose up -d)
+      changed_when: true
+
+    # --- Nginx + Certbot (HTTPS) ---
     - name: Install nginx + certbot
       apt:
         name: [nginx, certbot, python3-certbot-nginx]
@@ -52,7 +88,7 @@
         state: restarted
         enabled: yes
 
-    - name: Obtain/renew LetsEncrypt cert
+    - name: Try obtain/renew LetsEncrypt cert (won't fail if domain not ready)
       command: >
         certbot --nginx -n
         --agree-tos
@@ -60,4 +96,16 @@
         -d {{ public_fqdn }}
       register: certbot_out
       changed_when: "'Congratulations' in certbot_out.stdout or 'renewed' in certbot_out.stdout"
-      failed_when: certbot_out.rc != 0 and ('not yet due' not in certbot_out.stdout|lower)
+      failed_when: false
+
+    - name: Show certbot output (info)
+      debug:
+        var: certbot_out.stdout_lines
+
+    - name: Write compose .env for ONLINE URLs (activation links)
+      copy:
+        dest: "{{ compose_dir }}/.env"
+        mode: "0644"
+        content: |
+          APP_PUBLIC_BASE_URL=http://34.170.9.226
+          APP_FRONTEND_URL=http://34.170.9.226
