@@ -10,7 +10,7 @@ pipeline {
         stage('Create infra-check-cloud job') {
             steps {
                 jobDsl(
-                        targets: 'ci/jenkins/jobdsl/infra_check_cloud_only.groovy',
+                        targets: 'ci/jenkins/jobdsl/infra_check_cloud.groovy',
                         lookupStrategy: 'JENKINS_ROOT'
                 )
             }
