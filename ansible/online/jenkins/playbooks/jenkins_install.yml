@@ -1,0 +1,93 @@
+---
+- name: Install Jenkins (LTS) with Java 21 on Jenkins VM (cloud-safe)
+  hosts: jenkins
+  become: true
+
+  vars:
+    jenkins_url: "http://{{ hostvars[inventory_hostname].ansible_host }}:8080"
+    jenkins_login_url: "{{ jenkins_url }}/login"
+
+  tasks:
+    - name: Precheck Jenkins service active
+      shell: "systemctl is-active --quiet jenkins && echo active || echo inactive"
+      register: jenkins_active
+      changed_when: false
+
+    - name: Precheck Jenkins port 8080 listening
+      shell: "ss -lntp | grep -q ':8080' && echo listening || echo not_listening"
+      register: jenkins_listen
+      changed_when: false
+
+    - name: Skip install if Jenkins is already healthy
+      meta: end_play
+      when: jenkins_active.stdout.strip() == 'active' and jenkins_listen.stdout.strip() == 'listening'
+
+    - name: Install base prerequisites + Java 21 + tools
+      apt:
+        name:
+          - ca-certificates
+          - curl
+          - gnupg
+          - apt-transport-https
+          - openjdk-21-jre
+          - git
+          - ansible
+          - python3
+          - python3-pip
+        state: present
+        update_cache: yes
+
+    - name: Create keyrings directory
+      file:
+        path: /etc/apt/keyrings
+        state: directory
+        mode: "0755"
+
+    - name: Add Jenkins repository key (debian-stable)
+      shell: |
+        curl -fsSL https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key \
+          | tee /etc/apt/keyrings/jenkins-keyring.asc >/dev/null
+        chmod 0644 /etc/apt/keyrings/jenkins-keyring.asc
+      args:
+        creates: /etc/apt/keyrings/jenkins-keyring.asc
+
+    - name: Add Jenkins apt repository
+      copy:
+        dest: /etc/apt/sources.list.d/jenkins.list
+        content: |
+          deb [signed-by=/etc/apt/keyrings/jenkins-keyring.asc] https://pkg.jenkins.io/debian-stable binary/
+        mode: "0644"
+
+    - name: apt update (best-effort retries)
+      shell: |
+        set -e
+        for i in 1 2 3 4 5; do
+          apt-get update && exit 0
+          sleep 3
+        done
+        exit 1
+
+    - name: Install Jenkins
+      apt:
+        name: jenkins
+        state: present
+
+    - name: Enable and start Jenkins service
+      service:
+        name: jenkins
+        state: started
+        enabled: yes
+
+    - name: Wait for Jenkins to respond on localhost:8080
+      uri:
+        url: "http://127.0.0.1:8080/login"
+        status_code: 200
+        validate_certs: false
+      register: jenkins_http
+      retries: 30
+      delay: 2
+      until: jenkins_http.status == 200
+
+    - name: Show Jenkins URL
+      debug:
+        msg: "Jenkins is up: {{ jenkins_login_url }}"
