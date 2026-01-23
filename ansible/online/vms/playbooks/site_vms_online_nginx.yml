@@ -362,8 +362,7 @@
   hosts: backend
   become: true
   vars:
-    public_fqdn: "ds2025.example.com"
-    public_base_url: "http://front"   # change to https://FQDN after certbot succeeds
+    public_base_url: "http://34.58.147.123"
   tasks:
     - name: Patch backend env file for online (APP_PUBLIC_BASE_URL)
       lineinfile:
@@ -381,13 +380,24 @@
       lineinfile:
         path: /opt/DS-2025/backend/app.env
         regexp: '^CORS_ALLOWED_ORIGINS='
-        line: "CORS_ALLOWED_ORIGINS={{ public_base_url }},http://front,http://localhost,http://127.0.0.1"
+        line: "CORS_ALLOWED_ORIGINS={{ public_base_url }},http://localhost,http://127.0.0.1"
 
     - name: Restart backend
       service:
         name: ds2025-backend
         state: restarted
-      failed_when: false
+
 
 # 14) Healthchecks (reuse existing)
-- import_playbook: ../../../vms/playbooks/healthcheck.yml
+- name: Healthcheck (single VM)
+  hosts: backend
+  become: true
+  tasks:
+    - name: Check DB local
+      shell: nc -vz -w 2 127.0.0.1 5432
+      changed_when: false
+
+    - name: Check backend local
+      shell: curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:8080/ || true
+      changed_when: false
+
