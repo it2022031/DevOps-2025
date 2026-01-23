@@ -1,29 +1,165 @@
 ---
-# 1) Existing MicroK8s install + apply core (top-level imports)
-- import_playbook: ../../k8s/playbooks/microk8s_install.yml
-- import_playbook: ../../k8s/playbooks/k8s_apply_core.yml
+- import_playbook: ../../../k8s/playbooks/microk8s_install.yml
 
-# 2) Online-only steps
-- name: ONLINE K8s deploy (HTTPS via host Nginx+Certbot -> MicroK8s ingress)
+- name: ONLINE K8s deploy (MicroK8s) + apply DS2025 + host Nginx
   hosts: k8s_nodes
   become: true
 
   vars:
-    public_fqdn: "ds2025.example.com"       # <-- βάλε το δικό σου
-    letsencrypt_email: "you@example.com"    # <-- βάλε το δικό σου
+    public_ip: "35.184.112.234"
+    public_url: "http://{{ public_ip }}"
+
+    public_fqdn: "ds2025.example.com"
+    letsencrypt_email: "you@example.com"
+
     nginx_site: "ds2025-k8s-online"
-    public_base_url: "https://{{ public_fqdn }}"
+
+    local_manifests_dir: "{{ playbook_dir }}/../../../k8s/manifests"
+    remote_manifests_dir: "/opt/ds2025-manifests"
+
+    cloud_photos_dir: "/opt/ds2025-photos"
+    local_photos_dir: "{{ playbook_dir }}/../../../../data/sqlData/photos"
+
+    # ✅ MailHog public ports (NodePort)
+    mailhog_nodeport_http: 30025   # UI + API (8025)
+    mailhog_nodeport_smtp: 31025   # SMTP (1025) - προαιρετικό
 
   tasks:
-    - name: Set backend public URLs + CORS for online
+    - name: Sanity check manifests exist on controller
+      delegate_to: localhost
+      become: false
+      stat:
+        path: "{{ local_manifests_dir }}/00-namespace.yml"
+      register: ns_manifest
+
+    - name: Fail if local manifests not found
+      delegate_to: localhost
+      become: false
+      fail:
+        msg: "Local manifests missing at {{ local_manifests_dir }} (expected 00-namespace.yml)"
+      when: not ns_manifest.stat.exists
+
+    - name: Wait for MicroK8s to be ready
+      shell: microk8s status --wait-ready
+      changed_when: false
+
+    - name: Create remote manifests dir
+      file:
+        path: "{{ remote_manifests_dir }}"
+        state: directory
+        mode: "0755"
+
+    - name: Ensure ansible remote tmp exists (avoid permission issues)
+      file:
+        path: /tmp/.ansible-cloud/tmp
+        state: directory
+        mode: "1777"
+
+    - name: Copy manifests to remote VM
+      copy:
+        src: "{{ local_manifests_dir }}/"
+        dest: "{{ remote_manifests_dir }}/"
+        mode: "0644"
+
+    - name: Ensure cloud photos dir exists (replaces /vagrant/... path)
+      file:
+        path: "{{ cloud_photos_dir }}"
+        state: directory
+        mode: "0755"
+
+    - name: Check if photos already exist on VM (avatar + property)
+      shell: |
+        test -d "{{ cloud_photos_dir }}/avatar_photos" && \
+        (test -d "{{ cloud_photos_dir }}/property_photos" || test -d "{{ cloud_photos_dir }}/property_photos ")
+      args:
+        executable: /bin/bash
+      register: photos_present
+      changed_when: false
+      failed_when: false
+
+    - name: Copy photos to VM (controller → cloud VM) only if missing
+      copy:
+        src: "{{ local_photos_dir }}/"
+        dest: "{{ cloud_photos_dir }}/"
+        mode: "0644"
+      when: photos_present.rc != 0
+
+    - name: Normalize property_photos folder name (remove trailing space)
+      shell: |
+        set -e
+        if [ -d "{{ cloud_photos_dir }}/property_photos " ] && [ ! -d "{{ cloud_photos_dir }}/property_photos" ]; then
+          mv "{{ cloud_photos_dir }}/property_photos " "{{ cloud_photos_dir }}/property_photos"
+        fi
+        ls -la "{{ cloud_photos_dir }}"
+      changed_when: true
+
+    - name: Patch postgres manifest hostPath (replace /vagrant/... with cloud path)
+      shell: |
+        set -e
+        sed -i 's|/vagrant/data/sqlData/photos|{{ cloud_photos_dir }}|g' "{{ remote_manifests_dir }}/10-postgres.yml"
+        grep -nE "/vagrant/data/sqlData/photos|{{ cloud_photos_dir }}" "{{ remote_manifests_dir }}/10-postgres.yml" || true
+      changed_when: true
+
+    - name: Apply DS2025 manifests in order (remote paths)
+      shell: |
+        set -e
+        microk8s kubectl apply -f "{{ remote_manifests_dir }}/00-namespace.yml"
+        microk8s kubectl apply -f "{{ remote_manifests_dir }}/10-postgres.yml"
+        microk8s kubectl apply -f "{{ remote_manifests_dir }}/20-minio.yml"
+        microk8s kubectl apply -f "{{ remote_manifests_dir }}/30-mailhog.yml"
+        microk8s kubectl apply -f "{{ remote_manifests_dir }}/40-backend.yml"
+        microk8s kubectl apply -f "{{ remote_manifests_dir }}/50-frontend.yml"
+        microk8s kubectl apply -f "{{ remote_manifests_dir }}/60-ingress.yml"
+      changed_when: true
+
+    # ✅ Make MailHog permanently reachable from outside (no port-forward needed)
+    - name: Expose MailHog via NodePort (public)
+      shell: |
+        set -e
+        microk8s kubectl -n ds2025 patch svc mailhog -p "
+        spec:
+          type: NodePort
+          ports:
+            - name: smtp
+              port: 1025
+              targetPort: 1025
+              nodePort: {{ mailhog_nodeport_smtp }}
+            - name: http
+              port: 8025
+              targetPort: 8025
+              nodePort: {{ mailhog_nodeport_http }}
+        "
+        microk8s kubectl -n ds2025 get svc mailhog -o wide
+      changed_when: true
+
+    - name: Restart Postgres pod to pick up patched hostPath + photos
+      shell: |
+        set -e
+        microk8s kubectl -n ds2025 delete pod postgres-0 --ignore-not-found=true
+      changed_when: true
+
+    - name: Wait for Postgres to be Ready
+      shell: |
+        set -e
+        microk8s kubectl -n ds2025 wait --for=condition=Ready pod/postgres-0 --timeout=600s
+      changed_when: false
+
+    - name: Wait for backend/frontend rollout
+      shell: |
+        set -e
+        microk8s kubectl -n ds2025 rollout status deploy/backend --timeout=300s
+        microk8s kubectl -n ds2025 rollout status deploy/frontend --timeout=300s
+      changed_when: false
+
+    - name: Patch backend env for ONLINE URLs (activation links + CORS)
       shell: |
         set -e
         microk8s kubectl -n ds2025 set env deploy/backend \
-          APP_PUBLIC_BASE_URL="{{ public_base_url }}" \
-          APP_FRONTEND_URL="{{ public_base_url }}" \
-          CORS_ALLOWED_ORIGINS="{{ public_base_url }},http://{{ public_fqdn }}"
+          APP_PUBLIC_BASE_URL="{{ public_url }}" \
+          APP_FRONTEND_URL="{{ public_url }}" \
+          CORS_ALLOWED_ORIGINS="{{ public_url }},http://{{ public_ip }}"
         microk8s kubectl -n ds2025 rollout restart deploy/backend
-        microk8s kubectl -n ds2025 rollout status deploy/backend --timeout=180s
+        microk8s kubectl -n ds2025 rollout status deploy/backend --timeout=300s
       changed_when: true
 
     - name: Install nginx + certbot
@@ -32,15 +168,9 @@
         state: present
         update_cache: yes
 
-    - name: Create webroot for certbot
-      file:
-        path: /var/www/certbot
-        state: directory
-        mode: "0755"
-
-    - name: Write nginx vhost (HTTP -> proxy to ingress)
+    - name: Deploy nginx vhost (app + /mailhog/)
       template:
-        src: ../../nginx/templates/ds2025_k8s.conf.j2
+        src: ../../../online/nginx/templates/ds2025_k8s.conf.j2
         dest: "/etc/nginx/sites-available/{{ nginx_site }}"
         mode: "0644"
 
@@ -65,12 +195,16 @@
         state: restarted
         enabled: yes
 
-    - name: Obtain/renew LetsEncrypt cert
+    - name: Try obtain LetsEncrypt cert (best effort; needs DNS)
       command: >
         certbot --nginx -n
         --agree-tos
         -m {{ letsencrypt_email }}
         -d {{ public_fqdn }}
       register: certbot_out
+      failed_when: false
       changed_when: "'Congratulations' in certbot_out.stdout or 'renewed' in certbot_out.stdout"
-      failed_when: certbot_out.rc != 0 and ('not yet due' not in certbot_out.stdout|lower)
+
+    - name: Show cluster status
+      shell: microk8s kubectl -n ds2025 get pods,svc,ingress -o wide
+      changed_when: false

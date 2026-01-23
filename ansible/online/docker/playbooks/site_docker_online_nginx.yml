@@ -2,7 +2,7 @@
 # 1) Install Docker on docker_nodes using your existing playbook (TOP-LEVEL)
 - import_playbook: ../../../docker/playbooks/install_docker.yml
 
-# 2) Online deploy (clone repo -> docker compose up) + Nginx/Certbot
+# 2) Online deploy (clone repo -> compose up) + Nginx/Certbot
 - name: ONLINE Docker deploy (clone repo -> compose up) + HTTPS via Nginx/Certbot
   hosts: docker_nodes
   become: true
@@ -12,7 +12,10 @@
     project_dir: /opt/DevOps-2025
     compose_dir: "{{ project_dir }}/ansible/docker"
 
-    # ONLINE (βάλε τα σωστά όταν έχεις domain)
+    # ONLINE public URL (βάλε FQDN όταν το έχεις, προς το παρόν IP)
+    public_url: "http://34.170.9.226"
+
+    # Certbot (θα δουλέψει όταν έχεις DNS σωστό + 80/443 open)
     public_fqdn: "ds2025.example.com"
     letsencrypt_email: "you@example.com"
     nginx_site: "ds2025-online"
@@ -41,12 +44,32 @@
         msg: "Missing docker-compose.yml at {{ compose_dir }}/docker-compose.yml"
       when: not dc.stat.exists
 
-    - name: Compose up (NO BUILD)
+    # IMPORTANT: compose has hardcoded 127.0.0.1:8081, so patch it for ONLINE
+    - name: Patch docker-compose.yml (APP_PUBLIC_BASE_URL / APP_FRONTEND_URL) for ONLINE
       shell: |
         set -e
         cd "{{ compose_dir }}"
-        (docker compose up -d || docker-compose up -d)
+        sed -i 's|APP_PUBLIC_BASE_URL: "http://127.0.0.1:8081"|APP_PUBLIC_BASE_URL: "{{ public_url }}"|g' docker-compose.yml
+        sed -i 's|APP_FRONTEND_URL: "http://127.0.0.1:8081"|APP_FRONTEND_URL: "{{ public_url }}"|g' docker-compose.yml
+        grep -n 'APP_PUBLIC_BASE_URL\|APP_FRONTEND_URL' docker-compose.yml
+      args:
+        executable: /bin/bash
       changed_when: true
+
+    - name: Compose up (force recreate so env changes apply)
+      shell: |
+        set -e
+        cd "{{ compose_dir }}"
+        (docker compose up -d --force-recreate || docker-compose up -d --force-recreate)
+      args:
+        executable: /bin/bash
+      changed_when: true
+
+    - name: Show backend env from container (debug)
+      shell: |
+        set -e
+        docker exec docker-backend-1 printenv | egrep 'APP_PUBLIC_BASE_URL|APP_FRONTEND_URL' || true
+      changed_when: false
 
     # --- Nginx + Certbot (HTTPS) ---
     - name: Install nginx + certbot
@@ -101,11 +124,3 @@
     - name: Show certbot output (info)
       debug:
         var: certbot_out.stdout_lines
-
-    - name: Write compose .env for ONLINE URLs (activation links)
-      copy:
-        dest: "{{ compose_dir }}/.env"
-        mode: "0644"
-        content: |
-          APP_PUBLIC_BASE_URL=http://34.170.9.226
-          APP_FRONTEND_URL=http://34.170.9.226
