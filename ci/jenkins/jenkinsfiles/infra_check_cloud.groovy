@@ -1,33 +1,17 @@
-pipeline {
-    agent any
-    options { timestamps() }
+def repoUrl = 'https://github.com/it2022031/DevOps-2025.git'
+def branch  = '*/main'
 
-    environment {
-        ANSIBLE_HOST_KEY_CHECKING = "False"
-    }
-
-    stages {
-        stage('Checkout') {
-            steps { checkout scm }
-        }
-
-        stage('Ping (all VMs except Jenkins)') {
-            steps {
-                sh '''
-          set -euo pipefail
-
-          INV="infra/inventories/cloud.ini"
-          if [ ! -f "$INV" ]; then
-            echo "ERROR: inventory not found: $INV"
-            echo "Available inventories:"
-            ls -la infra/inventories || true
-            exit 1
-          fi
-
-          # Exclude Jenkins host/group names (both patterns, just in case)
-          ansible -i "$INV" 'all:!jenkins:!jenkins_nodes' -m ping
-        '''
+pipelineJob('infra-check-cloud') {
+    definition {
+        cpsScm {
+            scm {
+                git {
+                    remote { url(repoUrl) }
+                    branches(branch)
+                }
             }
+            scriptPath('ci/jenkins/jenkinsfiles/infra_check_cloud.groovy')
+            lightweight(true)
         }
     }
 }
