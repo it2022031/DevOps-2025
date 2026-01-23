@@ -1,0 +1,34 @@
+---
+- name: Seed PostgreSQL database on ONLINE VM
+  hosts: db
+  become: true
+
+  vars:
+    db_name: demo_db
+    db_user: demo_user
+    db_pass: demo_pass
+
+    local_sql: "{{ playbook_dir }}/../../../../data/sqlData/test_dedomena.sql"
+    remote_sql: /tmp/test_dedomena.sql
+
+  tasks:
+    - name: Ensure postgresql client exists
+      apt:
+        name: postgresql-client
+        state: present
+        update_cache: yes
+
+    - name: Copy seed SQL to DB VM
+      copy:
+        src: "{{ local_sql }}"
+        dest: "{{ remote_sql }}"
+        mode: "0644"
+
+    - name: Run seed SQL
+      shell: |
+        set -euo pipefail
+        export PGPASSWORD='{{ db_pass }}'
+        psql -h 127.0.0.1 -U '{{ db_user }}' -d '{{ db_name }}' \
+             -v ON_ERROR_STOP=1 -f '{{ remote_sql }}'
+      args:
+        executable: /bin/bash

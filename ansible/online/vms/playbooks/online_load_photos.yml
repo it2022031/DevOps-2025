@@ -1,0 +1,94 @@
+---
+- name: Load photos into PostgreSQL on ONLINE VM (idempotent)
+  hosts: db
+  become: true
+
+  vars:
+    db_name: demo_db
+    local_sql: "{{ playbook_dir }}/../../../../data/sqlData/load_photos.sql"
+    local_photos: "{{ playbook_dir }}/../../../../data/sqlData/photos"
+    remote_sql: /tmp/load_photos.sql
+    remote_photos: /opt/ds2025-photos
+
+  tasks:
+    - name: Check if photos already loaded in DB
+      shell: |
+        sudo -u postgres psql -d '{{ db_name }}' -tAc \
+          "select count(*) from property_photos;"
+      register: photo_count
+      changed_when: false
+      failed_when: false
+
+    - name: Show current photo count
+      debug:
+        msg: "property_photos count = {{ photo_count.stdout | default('0') }}"
+
+    # 🔒 Αν υπάρχουν ήδη φωτογραφίες → ΤΕΛΟΣ
+    - name: Skip loading photos if already present
+      debug:
+        msg: "Photos already loaded, skipping import."
+      when: photo_count.stdout | int > 0
+
+    # ⬇️ ΟΛΑ τα παρακάτω τρέχουν ΜΟΝΟ αν δεν υπάρχουν φωτογραφίες
+    - block:
+
+        - name: Copy load_photos.sql
+          copy:
+            src: "{{ local_sql }}"
+            dest: "{{ remote_sql }}"
+            mode: "0644"
+
+        - name: Copy photos directory to DB VM
+          copy:
+            src: "{{ local_photos }}/"
+            dest: "{{ remote_photos }}/"
+            mode: "0644"
+
+        - name: Prepare /photos symlinks expected by SQL
+          shell: |
+            set -e
+
+            rm -rf /photos
+            mkdir -p /photos
+
+            test -d "{{ remote_photos }}/avatar_photos"
+
+            if [ -d "{{ remote_photos }}/property_photos" ]; then
+              PROP="{{ remote_photos }}/property_photos"
+            elif [ -d "{{ remote_photos }}/property_photos " ]; then
+              PROP="{{ remote_photos }}/property_photos "
+            else
+              echo "property_photos folder not found"
+              exit 1
+            fi
+
+            ln -s "{{ remote_photos }}/avatar_photos" /photos/avatar_photos
+            ln -s "$PROP" /photos/property_photos
+
+            ls -la /photos
+          args:
+            executable: /bin/bash
+
+        - name: Run load_photos.sql as postgres
+          shell: |
+            set -euo pipefail
+            sudo -u postgres bash -lc "
+              cd /tmp &&
+              psql -d '{{ db_name }}' -v ON_ERROR_STOP=1 -f '{{ remote_sql }}'
+            "
+          args:
+            executable: /bin/bash
+
+        - name: Final sanity check
+          shell: |
+            sudo -u postgres psql -d '{{ db_name }}' \
+              -c 'select count(*) as property_photos from property_photos;'
+          args:
+            executable: /bin/bash
+          register: final_count
+          changed_when: false
+
+        - debug:
+            var: final_count.stdout_lines
+
+      when: photo_count.stdout | int == 0
