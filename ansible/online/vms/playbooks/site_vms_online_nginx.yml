@@ -1,123 +1,393 @@
 ---
-- name: ONLINE VMs deploy (backend/db/front) + HTTPS on front via Nginx/Certbot
+# 0) Preflight + hosts map (keeps backend/db/front names resolving)
+- import_playbook: ../../../vms/playbooks/preflight_host.yml
+- import_playbook: ../../../common/playbooks/hosts_map.yml
+
+# 1) Common prep on the VM(s)
+- name: Common prep on all VMs (single box via inventory hack)
   hosts: vms
   become: true
-
-  vars:
-    public_fqdn: "ds2025.example.com"       # <-- βάλε το δικό σου
-    letsencrypt_email: "you@example.com"    # <-- βάλε το δικό σου
-    public_base_url: "https://{{ public_fqdn }}"
-    nginx_site_online: "ds2025-online"
-
   tasks:
-    # 1) Deploy the stack using your existing Jenkins-safe VM playbook (works with cloud inventory too)
-    - name: Deploy DS2025 stack on VMs (reuse existing)
-      import_playbook: ../../../vms/playbooks/site_jenkins.yml
+    - name: Ensure ansible remote tmp exists
+      file:
+        path: /tmp/.ansible-jenkins/tmp
+        state: directory
+        mode: "1777"
 
-    # 2) Update backend public url + cors (so activation links are correct)
-    - name: Set backend public URL + CORS for online
-      when: inventory_hostname == 'backend'
-      block:
-        - name: Patch backend env file for online (APP_PUBLIC_BASE_URL + CORS)
-          lineinfile:
-            path: /opt/DS-2025/backend/app.env
-            regexp: '^APP_PUBLIC_BASE_URL='
-            line: "APP_PUBLIC_BASE_URL={{ public_base_url }}"
+# 2) PostgreSQL on db host (cloud-safe: detect version from /etc/postgresql)
+- name: Install + configure PostgreSQL on db (cloud-safe)
+  hosts: db
+  become: true
+  vars:
+    db_user: "demo_user"
+    db_pass: "demo_pass"
+    db_name: "demo_db"
+  tasks:
+    - name: Install PostgreSQL and contrib
+      apt:
+        name: [postgresql, postgresql-contrib]
+        state: present
+        update_cache: yes
 
-        - name: Patch backend env file for online (APP_FRONTEND_URL)
-          lineinfile:
-            path: /opt/DS-2025/backend/app.env
-            regexp: '^APP_FRONTEND_URL='
-            line: "APP_FRONTEND_URL={{ public_base_url }}"
+    - name: Detect PostgreSQL major version from /etc/postgresql
+      shell: ls -1 /etc/postgresql | sort -n | tail -n 1
+      register: pg_major
+      changed_when: false
 
-        - name: Patch backend env file for online (CORS_ALLOWED_ORIGINS)
-          lineinfile:
-            path: /opt/DS-2025/backend/app.env
-            regexp: '^CORS_ALLOWED_ORIGINS='
-            line: "CORS_ALLOWED_ORIGINS={{ public_base_url }},http://{{ public_fqdn }}"
+    - name: Configure listen_addresses
+      lineinfile:
+        path: "/etc/postgresql/{{ pg_major.stdout }}/main/postgresql.conf"
+        regexp: '^#?listen_addresses\s*='
+        line: "listen_addresses = '127.0.0.1'"
+      notify: restart postgres
 
-        - name: Restart backend
-          service:
-            name: ds2025-backend
-            state: restarted
+    - name: Ensure PostgreSQL is running
+      service:
+        name: postgresql
+        state: started
+        enabled: yes
 
-    # 3) Install nginx+certbot ONLY on front (TLS terminator)
-    - name: Install nginx + certbot on front
-      when: inventory_hostname == 'front'
-      block:
-        - name: Install nginx + certbot
-          apt:
-            name: [nginx, certbot, python3-certbot-nginx]
-            state: present
-            update_cache: yes
+    - name: Apply pending handler actions now
+      meta: flush_handlers
 
-        - name: Create webroot for certbot
-          file:
-            path: /var/www/certbot
-            state: directory
-            mode: "0755"
+    - name: Create PostgreSQL user (safe)
+      shell: |
+        set -e
+        sudo -u postgres psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='{{ db_user }}'" | grep -q 1 \
+          || sudo -u postgres psql -c "CREATE USER {{ db_user }} WITH PASSWORD '{{ db_pass }}';"
 
-        # Write an online-specific nginx site (HTTP first)
-        - name: Write nginx online vhost (HTTP)
-          copy:
-            dest: "/etc/nginx/sites-available/{{ nginx_site_online }}"
-            mode: "0644"
-            content: |
-              server {
-                listen 80;
-                server_name {{ public_fqdn }};
+    - name: Create PostgreSQL database (safe)
+      shell: |
+        set -e
+        sudo -u postgres psql -tAc "SELECT 1 FROM pg_database WHERE datname='{{ db_name }}'" | grep -q 1 \
+          || sudo -u postgres psql -c "CREATE DATABASE {{ db_name }} OWNER {{ db_user }};"
 
-                location /.well-known/acme-challenge/ {
-                  root /var/www/certbot;
-                }
+    - name: Ensure privileges (safe)
+      shell: |
+        set -e
+        sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE {{ db_name }} TO {{ db_user }};"
 
-                location / {
-                  proxy_pass http://127.0.0.1:8081;
-                  proxy_http_version 1.1;
-                  proxy_set_header Host $host;
-                  proxy_set_header X-Real-IP $remote_addr;
-                  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-                  proxy_set_header X-Forwarded-Proto $scheme;
-                }
+    - name: Wait for PostgreSQL to listen on 5432
+      wait_for:
+        host: "127.0.0.1"
+        port: 5432
+        timeout: 60
 
-                location /api/ {
-                  proxy_pass http://{{ hostvars['backend'].ansible_host }}:8080;
-                  proxy_http_version 1.1;
-                  proxy_set_header Host $host;
-                  proxy_set_header X-Real-IP $remote_addr;
-                  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-                  proxy_set_header X-Forwarded-Proto $scheme;
-                }
-              }
+  handlers:
+    - name: restart postgres
+      service:
+        name: postgresql
+        state: restarted
 
-        - name: Enable nginx online site
-          file:
-            src: "/etc/nginx/sites-available/{{ nginx_site_online }}"
-            dest: "/etc/nginx/sites-enabled/{{ nginx_site_online }}"
-            state: link
+# 3) Supporting services on backend (imports that already work)
+- import_playbook: ../../../vms/playbooks/minio.yml
+  vars:
+    target_hosts: backend
 
-        - name: Disable default nginx site
-          file:
-            path: /etc/nginx/sites-enabled/default
-            state: absent
+- import_playbook: ../../../vms/playbooks/mailhog.yml
+  vars:
+    target_hosts: backend
 
-        - name: Validate nginx config
-          command: nginx -t
-          changed_when: false
+# 4) Backend prerequisites (imports that already work)
+- import_playbook: ../../../vms/playbooks/java21.yml
+  vars:
+    target_hosts: backend
 
-        - name: Restart nginx
-          service:
-            name: nginx
-            state: restarted
-            enabled: yes
+- import_playbook: ../../../vms/playbooks/maven.yml
+  vars:
+    target_hosts: backend
 
-        - name: Obtain/renew LetsEncrypt cert (nginx plugin)
-          command: >
-            certbot --nginx -n
-            --agree-tos
-            -m {{ letsencrypt_email }}
-            -d {{ public_fqdn }}
-          register: certbot_out
-          changed_when: "'Congratulations' in certbot_out.stdout or 'renewed' in certbot_out.stdout"
+# 5) Cloud-safe clone (INLINE: no vagrant, correct branch, correct ownership)
+- name: Clone or update DS-2025 repository (cloud-safe, no vagrant)
+  hosts: backend
+  become: true
+  vars:
+    repo_url: "https://github.com/it2022031/DS-2025.git"
+    project_dir: "/opt/DS-2025"
+    repo_version: "main-branch"
+    app_owner: "{{ ansible_user }}"
+    version_file: "/opt/DS-2025/VERSION"
+  tasks:
+    - name: Ensure git is installed
+      apt:
+        name: git
+        state: present
+        update_cache: yes
+        cache_valid_time: 3600
 
-  # end
+    - name: Check if repo already exists
+      stat:
+        path: "{{ project_dir }}/.git"
+      register: repo_git
+
+    - name: Clone repository if missing
+      git:
+        repo: "{{ repo_url }}"
+        dest: "{{ project_dir }}"
+        version: "{{ repo_version }}"
+        update: yes
+        force: yes
+      when: not repo_git.stat.exists
+
+    - name: Force update repo if exists
+      shell: |
+        set -e
+        cd "{{ project_dir }}"
+        git fetch --all --prune
+        git reset --hard "origin/{{ repo_version }}"
+        git clean -fd
+      args:
+        executable: /bin/bash
+      when: repo_git.stat.exists
+
+    - name: Ensure correct ownership
+      file:
+        path: "{{ project_dir }}"
+        owner: "{{ app_owner }}"
+        group: "{{ app_owner }}"
+        recurse: yes
+
+    - name: Write VERSION file with current commit
+      shell: |
+        set -e
+        cd "{{ project_dir }}"
+        git rev-parse --short HEAD > "{{ version_file }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Show VERSION
+      command: cat {{ version_file }}
+      register: ver_out
+      changed_when: false
+
+    - debug:
+        msg: "DS-2025 VERSION={{ ver_out.stdout }}"
+
+# 6) Backend env (reuse existing backend_env.yml but override vars for single host)
+- import_playbook: ../../../vms/playbooks/backend_env.yml
+  vars:
+    target_hosts: backend
+    db_host: 127.0.0.1
+    mail_host: 127.0.0.1
+    minio_endpoint: "http://127.0.0.1:9000"
+    app_public_base_url: "http://front"   # will be fixed later by HTTPS/CORS patch section
+    cors_allowed_origins: "http://front,http://localhost,http://127.0.0.1"
+
+# 7) Build backend JAR (INLINE: no vagrant)
+- name: Build Spring Boot backend JAR (cloud-safe, no vagrant)
+  hosts: backend
+  become: true
+  vars:
+    project_dir: /opt/DS-2025/backend/demo
+    jar_dest: /opt/DS-2025/backend/app.jar
+    build_user: "{{ ansible_user }}"
+  tasks:
+    - name: Build backend (skip tests)
+      command: mvn -DskipTests package
+      args:
+        chdir: "{{ project_dir }}"
+      become_user: "{{ build_user }}"
+
+    - name: Find built jar (exclude sources/javadoc/original)
+      shell: |
+        ls -1 {{ project_dir }}/target/*.jar \
+          | grep -vE '(-sources|-javadoc|\.original)\.jar$' \
+          | head -n 1
+      args:
+        executable: /bin/bash
+      register: built_jar
+      changed_when: false
+
+    - name: Fail if no jar found
+      fail:
+        msg: "Build finished but no suitable JAR found in {{ project_dir }}/target"
+      when: built_jar.stdout | length == 0
+
+    - name: Copy jar to stable path (app.jar)
+      copy:
+        src: "{{ built_jar.stdout }}"
+        dest: "{{ jar_dest }}"
+        remote_src: true
+        owner: root
+        group: root
+        mode: "0755"
+
+# 8) Backend systemd service (INLINE: no vagrant)
+- name: Create and run backend systemd service (cloud-safe, no vagrant)
+  hosts: backend
+  become: true
+  vars:
+    app_name: ds2025-backend
+    workdir: /opt/DS-2025/backend
+    jar_path: /opt/DS-2025/backend/app.jar
+    env_file: /opt/DS-2025/backend/app.env
+    run_user: "{{ ansible_user }}"
+  tasks:
+    - name: Create systemd unit file
+      copy:
+        dest: "/etc/systemd/system/{{ app_name }}.service"
+        mode: "0644"
+        content: |
+          [Unit]
+          Description=DS-2025 Spring Boot Backend
+          Wants=network-online.target
+          After=network-online.target
+
+          [Service]
+          Type=simple
+          User={{ run_user }}
+          WorkingDirectory={{ workdir }}
+          EnvironmentFile={{ env_file }}
+          ExecStart=/usr/bin/java -jar {{ jar_path }}
+          Restart=always
+          RestartSec=3
+          SuccessExitStatus=143
+
+          [Install]
+          WantedBy=multi-user.target
+
+    - name: Reload systemd daemon
+      systemd:
+        daemon_reload: yes
+
+    - name: Enable and start backend service
+      systemd:
+        name: "{{ app_name }}"
+        enabled: yes
+        state: started
+
+    - name: Wait for backend port to be open
+      wait_for:
+        host: 127.0.0.1
+        port: 8080
+        state: started
+        timeout: 120
+
+# 9) Frontend prerequisites (we will NOT import nvm_install/nvm_verify that are vagrant-only)
+# We’ll just ensure node/npm exist and then reuse your existing frontend playbooks that already auto-detect user.
+- name: Ensure Node.js/npm available on front (cloud-safe)
+  hosts: front
+  become: true
+  tasks:
+    - name: Install nodejs + npm (system)
+      apt:
+        name: [nodejs, npm]
+        state: present
+        update_cache: yes
+        cache_valid_time: 3600
+
+# 10) Frontend env/build (reuse existing ones that auto-detect user)
+- import_playbook: ../../../vms/playbooks/frontend_env.yml
+  vars:
+    target_hosts: front
+
+- import_playbook: ../../../vms/playbooks/frontend_strip_localhost.yml
+  vars:
+    target_hosts: front
+
+- import_playbook: ../../../vms/playbooks/frontend_build.yml
+  vars:
+    target_hosts: front
+
+# 11) Frontend systemd service (INLINE: no vagrant)
+- name: Create and run frontend systemd service (cloud-safe, no vagrant)
+  hosts: front
+  become: true
+  vars:
+    app_name: ds2025-frontend
+    run_user: "{{ ansible_user }}"
+    frontend_dir: "/opt/DS-2025/frontend/vue-argon-design-system-master"
+    front_port: 8081
+  tasks:
+    - name: Create systemd unit for frontend (serve dist via npx serve)
+      copy:
+        dest: "/etc/systemd/system/{{ app_name }}.service"
+        mode: "0644"
+        content: |
+          [Unit]
+          Description=DS-2025 Frontend (serve dist)
+          Wants=network-online.target
+          After=network-online.target
+
+          [Service]
+          Type=simple
+          User={{ run_user }}
+          WorkingDirectory={{ frontend_dir }}
+          ExecStart=/usr/bin/env bash -lc 'cd "{{ frontend_dir }}" && npx --yes serve -s dist -l {{ front_port }}'
+          Restart=always
+          RestartSec=3
+
+          [Install]
+          WantedBy=multi-user.target
+
+    - name: Reload systemd
+      systemd:
+        daemon_reload: true
+
+    - name: Enable and start frontend service
+      systemd:
+        name: "{{ app_name }}"
+        enabled: true
+        state: started
+
+    - name: Wait for frontend port
+      wait_for:
+        host: 127.0.0.1
+        port: "{{ front_port }}"
+        timeout: 90
+
+# 12) Nginx on front (reuse existing nginx playbooks)
+- import_playbook: ../../../vms/playbooks/nginx_install.yml
+  vars:
+    target_hosts: front
+
+- import_playbook: ../../../vms/playbooks/nginx_site.yml
+  vars:
+    target_hosts: front
+    nginx_site: ds2025-front
+    upstream_host: 127.0.0.1
+    upstream_port: 8081
+    enable_api_proxy: true
+    api_prefix: "/api/"
+    api_upstream_host: "127.0.0.1"
+    api_upstream_port: 8080
+
+- import_playbook: ../../../vms/playbooks/nginx_restart.yml
+  vars:
+    target_hosts: front
+
+# 13) Online URL patch + CORS + restart backend
+- name: Patch backend public URL + CORS for online
+  hosts: backend
+  become: true
+  vars:
+    public_fqdn: "ds2025.example.com"
+    public_base_url: "http://front"   # change to https://FQDN after certbot succeeds
+  tasks:
+    - name: Patch backend env file for online (APP_PUBLIC_BASE_URL)
+      lineinfile:
+        path: /opt/DS-2025/backend/app.env
+        regexp: '^APP_PUBLIC_BASE_URL='
+        line: "APP_PUBLIC_BASE_URL={{ public_base_url }}"
+
+    - name: Patch backend env file for online (APP_FRONTEND_URL)
+      lineinfile:
+        path: /opt/DS-2025/backend/app.env
+        regexp: '^APP_FRONTEND_URL='
+        line: "APP_FRONTEND_URL={{ public_base_url }}"
+
+    - name: Patch backend env file for online (CORS_ALLOWED_ORIGINS)
+      lineinfile:
+        path: /opt/DS-2025/backend/app.env
+        regexp: '^CORS_ALLOWED_ORIGINS='
+        line: "CORS_ALLOWED_ORIGINS={{ public_base_url }},http://front,http://localhost,http://127.0.0.1"
+
+    - name: Restart backend
+      service:
+        name: ds2025-backend
+        state: restarted
+      failed_when: false
+
+# 14) Healthchecks (reuse existing)
+- import_playbook: ../../../vms/playbooks/healthcheck.yml

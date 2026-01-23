@@ -1,0 +1,91 @@
+---
+- name: Clone or update DS-2025 repository (cloud-safe)
+  hosts: "{{ target_hosts | default('single') }}"
+  become: true
+
+  vars:
+    repo_url: "https://github.com/it2022031/DS-2025.git"
+    project_dir: "/opt/DS-2025"
+    repo_version: "main-branch"           # ✅ όπως είπες
+    app_owner: "{{ ansible_user }}"       # ✅ όχι vagrant
+    version_file: "/opt/DS-2025/VERSION"
+
+  tasks:
+    - name: Ensure git is installed
+      apt:
+        name: git
+        state: present
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: Ensure project dir exists
+      file:
+        path: "{{ project_dir }}"
+        state: directory
+        mode: "0755"
+
+    - name: Check if repo already exists
+      stat:
+        path: "{{ project_dir }}/.git"
+      register: repo_git
+
+    - name: Discard local changes if repo exists (fetch + reset origin + clean)
+      shell: |
+        set -e
+        cd "{{ project_dir }}"
+        git fetch --all --prune
+        git reset --hard "origin/{{ repo_version }}"
+        git clean -fd
+      args:
+        executable: /bin/bash
+      when: repo_git.stat.exists
+
+    - name: Clone repository if missing
+      git:
+        repo: "{{ repo_url }}"
+        dest: "{{ project_dir }}"
+        version: "{{ repo_version }}"
+        update: yes
+        force: yes
+      when: not repo_git.stat.exists
+
+    - name: Ensure repo is updated to the latest remote state (force)
+      git:
+        repo: "{{ repo_url }}"
+        dest: "{{ project_dir }}"
+        version: "{{ repo_version }}"
+        update: yes
+        force: yes
+      when: repo_git.stat.exists
+
+    - name: Ensure correct ownership
+      file:
+        path: "{{ project_dir }}"
+        owner: "{{ app_owner }}"
+        group: "{{ app_owner }}"
+        recurse: yes
+
+    - name: Write VERSION file with current commit
+      shell: |
+        set -e
+        cd "{{ project_dir }}"
+        git rev-parse --short HEAD > "{{ version_file }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Show VERSION (commit hash)
+      command: cat {{ version_file }}
+      register: ver_out
+      changed_when: false
+
+    - name: Show repo status
+      command: git -C {{ project_dir }} status -sb
+      register: status_out
+      changed_when: false
+
+    - name: Print commit + status
+      debug:
+        msg:
+          - "VERSION={{ ver_out.stdout }}"
+          - "{{ status_out.stdout }}"
