@@ -50,9 +50,13 @@
       shell: |
         set -e
         cd "{{ compose_dir }}"
-        sed -i -E 's|APP_PUBLIC_BASE_URL:\s*\"[^\"]+\"|APP_PUBLIC_BASE_URL: "{{ public_url }}"|g' docker-compose.yml
-        sed -i -E 's|APP_FRONTEND_URL:\s*\"[^\"]+\"|APP_FRONTEND_URL: "{{ public_url }}"|g' docker-compose.yml
-        grep -n 'APP_PUBLIC_BASE_URL|APP_FRONTEND_URL' docker-compose.yml
+
+        # patch (αν υπάρχουν)
+        sed -i -E 's|APP_PUBLIC_BASE_URL:\s*"[^\"]*"|APP_PUBLIC_BASE_URL: "{{ public_url }}"|g' docker-compose.yml || true
+        sed -i -E 's|APP_FRONTEND_URL:\s*"[^\"]*"|APP_FRONTEND_URL: "{{ public_url }}"|g' docker-compose.yml || true
+
+        echo "== After patch (if keys exist) =="
+        grep -nE 'APP_PUBLIC_BASE_URL|APP_FRONTEND_URL' docker-compose.yml || true
       args:
         executable: /bin/bash
       changed_when: true
