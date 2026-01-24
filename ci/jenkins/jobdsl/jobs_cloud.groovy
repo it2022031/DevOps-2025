@@ -1,11 +1,8 @@
 def repoUrl = 'https://github.com/it2022031/DevOps-2025.git'
 def branch  = '*/main'
+def gitCreds = null // βάλε credentialsId αν χρειαστεί
 
-// αν χρειαστεί private repo:
-// def gitCreds = 'github-creds-id'
-def gitCreds = null
-
-pipelineJob('ping-vms') {
+pipelineJob('ping-cloud') {
     definition {
         cpsScm {
             scm {
