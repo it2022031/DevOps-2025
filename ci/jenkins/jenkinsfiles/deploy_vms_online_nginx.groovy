@@ -4,11 +4,8 @@ pipeline {
 
     environment {
         ANSIBLE_HOST_KEY_CHECKING = "False"
-        // αν έχεις ansible cfg στο repo, άστο. αλλιώς μπορείς να το βγάλεις.
-        // ANSIBLE_CONFIG = "infra/ansible/ansible-jenkins.cfg"
 
-        // ΣΗΜΑΝΤΙΚΟ: στο cloud Jenkins συνήθως το ~ ΔΕΝ είναι το ίδιο.
-        // Θα ορίσουμε key path explicit:
+        // SSH key που έχει ο Jenkins user (προσαρμόζεις αν έχει άλλο όνομα)
         ANSIBLE_PRIVATE_KEY_FILE = "/var/lib/jenkins/.ssh/id_vms"
         ANSIBLE_SSH_COMMON_ARGS  = "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=5"
         ANSIBLE_TIMEOUT = "30"
@@ -19,14 +16,27 @@ pipeline {
             steps { checkout scm }
         }
 
-        stage('Preflight: show inventory') {
+        stage('Preflight (paths + inventory)') {
             steps {
                 sh '''
           set -e
-          echo "== Inventory file =="
-          sed -n '1,200p' ansible/online/vms/inventories/cloud_vms.ini || true
-          echo "== ansible-inventory graph =="
-          ansible-inventory -i ansible/online/vms/inventories/cloud_vms.ini --graph
+          echo "WORKSPACE=$(pwd)"
+
+          echo "== check paths =="
+          test -f infra/inventories/cloud_vms.ini
+          test -f ansible/online/vms/playbooks/site_vms_online_nginx.yml
+
+          echo "== inventory file =="
+          sed -n '1,200p' infra/inventories/cloud_vms.ini
+
+          echo "== ansible version =="
+          ansible --version
+
+          echo "== inventory graph =="
+          ansible-inventory -i infra/inventories/cloud_vms.ini --graph
+
+          echo "== ping all =="
+          ansible -i infra/inventories/cloud_vms.ini all -m ping
         '''
             }
         }
@@ -35,12 +45,9 @@ pipeline {
             steps {
                 sh '''
           set -e
-          ansible --version
-
           ansible-playbook \
-            -i ansible/online/vms/inventories/cloud_vms.ini \
+            -i infra/inventories/cloud_vms.ini \
             ansible/online/vms/playbooks/site_vms_online_nginx.yml \
-            -l vms \
             -v
         '''
             }
@@ -50,10 +57,8 @@ pipeline {
             steps {
                 sh '''
           set -e
-          # Έλεγχος ότι front έχει nginx και ακούει
-          ansible -i ansible/online/vms/inventories/cloud_vms.ini front -b -m shell -a "systemctl is-active nginx && ss -lntp | egrep ':80|:8081' || true"
-          # Έλεγχος backend service
-          ansible -i ansible/online/vms/inventories/cloud_vms.ini backend -b -m shell -a "systemctl is-active ds2025-backend && ss -lntp | egrep ':8080|:5432' || true"
+          ansible -i infra/inventories/cloud_vms.ini front -b -m shell -a "systemctl is-active nginx && ss -lntp | egrep ':80|:8081' || true"
+          ansible -i infra/inventories/cloud_vms.ini backend -b -m shell -a "systemctl is-active ds2025-backend && ss -lntp | egrep ':8080|:5432' || true"
         '''
             }
         }
