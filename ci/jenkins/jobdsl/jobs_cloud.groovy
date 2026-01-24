@@ -36,3 +36,20 @@ pipelineJob('deploy-vms-online-nginx') {
         }
     }
 }
+pipelineJob('deploy-k8s-online-nginx') {
+    definition {
+        cpsScm {
+            scm {
+                git {
+                    remote {
+                        url(repoUrl)
+                        if (gitCreds) { credentials(gitCreds) }
+                    }
+                    branches(branch)
+                }
+            }
+            scriptPath('ci/jenkins/jenkinsfiles/deploy_k8s_online_nginx.groovy')
+            lightweight(true)
+        }
+    }
+}
