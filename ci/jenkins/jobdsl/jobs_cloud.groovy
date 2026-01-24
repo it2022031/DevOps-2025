@@ -70,3 +70,47 @@ pipelineJob('deploy-docker-online-nginx') {
         }
     }
 }
+pipelineJob('seed-vms-online') {
+    definition {
+        cpsScm {
+            scm {
+                git {
+                    remote { url(repoUrl); if (gitCreds) { credentials(gitCreds) } }
+                    branches(branch)
+                }
+            }
+            scriptPath('ci/jenkins/jenkinsfiles/seed_vms_online.groovy')
+            lightweight(true)
+        }
+    }
+}
+
+pipelineJob('load-photos-vms-online') {
+    definition {
+        cpsScm {
+            scm {
+                git {
+                    remote { url(repoUrl); if (gitCreds) { credentials(gitCreds) } }
+                    branches(branch)
+                }
+            }
+            scriptPath('ci/jenkins/jenkinsfiles/load_photos_vms_online.groovy')
+            lightweight(true)
+        }
+    }
+}
+
+pipelineJob('build-push-images-online') {
+    definition {
+        cpsScm {
+            scm {
+                git {
+                    remote { url(repoUrl); if (gitCreds) { credentials(gitCreds) } }
+                    branches(branch)
+                }
+            }
+            scriptPath('ci/jenkins/jenkinsfiles/build_push_images_online.groovy')
+            lightweight(true)
+        }
+    }
+}
