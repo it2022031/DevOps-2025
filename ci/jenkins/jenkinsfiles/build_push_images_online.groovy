@@ -13,7 +13,7 @@ pipeline {
 
         stage('Build & Push images (ONLINE dockerhost)') {
             steps {
-                withCredentials([string(credentialsId: 'ghcr_token', variable: 'GHCR_TOKEN')]) {
+                withCredentials([string(credentialsId: 'github-packages-token', variable: 'GHCR_TOKEN')]) {
                     sh '''
             set -e
             test -f infra/inventories/cloud_docker.ini
