@@ -17,7 +17,7 @@ pipelineJob('ping-vms') {
                     branches(branch)
                 }
             }
-            scriptPath('ci/jenkins/jenkinsfiles/ping_vms.groovy')
+            scriptPath('ci/jenkins/jenkinsfiles/cloud_ping_vms.groovy')
             lightweight(true)
         }
     }
