@@ -19,3 +19,20 @@ pipelineJob('ping-cloud') {
         }
     }
 }
+pipelineJob('deploy-vms-online-nginx') {
+    definition {
+        cpsScm {
+            scm {
+                git {
+                    remote {
+                        url(repoUrl)
+                        if (gitCreds) { credentials(gitCreds) }
+                    }
+                    branches(branch)
+                }
+            }
+            scriptPath('ci/jenkins/jenkinsfiles/deploy_vms_online_nginx.groovy')
+            lightweight(true)
+        }
+    }
+}
