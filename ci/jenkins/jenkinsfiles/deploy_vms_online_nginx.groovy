@@ -4,12 +4,10 @@ pipeline {
 
     environment {
         ANSIBLE_HOST_KEY_CHECKING = "False"
-
-        // SSH key που έχει ο Jenkins user (προσαρμόζεις αν έχει άλλο όνομα)
-        ANSIBLE_PRIVATE_KEY_FILE = "/var/lib/jenkins/.ssh/id_vms"
         ANSIBLE_SSH_COMMON_ARGS  = "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=5"
         ANSIBLE_TIMEOUT = "30"
     }
+
 
     stages {
         stage('Checkout') {
