@@ -20,7 +20,7 @@ pipeline {
             test -f ansible/docker/playbooks/build_push_images.yml
 
             ansible -i infra/inventories/cloud_docker.ini docker_nodes -m ping
-
+            ansible -i infra/inventories/cloud_docker.ini docker -m ping
             ansible-playbook \
               -i infra/inventories/cloud_docker.ini \
               ansible/docker/playbooks/build_push_images.yml \

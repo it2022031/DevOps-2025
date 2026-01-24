@@ -29,3 +29,10 @@ http://127.0.0.1:18025/
 jenkins//////
 http://127.0.0.1:8083/
 
+online vms 
+vms
+mailhog 8025
+k8s
+:30025
+docker
+:8025
