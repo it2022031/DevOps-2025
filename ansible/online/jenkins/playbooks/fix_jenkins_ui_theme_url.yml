@@ -1,0 +1,137 @@
+---
+- name: Fix Jenkins URL + theme CSS (avoid hardcoded old IP) and optionally disable theme plugins
+  hosts: jenkins
+  become: true
+
+  vars:
+    jenkins_port: 8080
+    jenkins_home: /var/lib/jenkins
+    location_xml: /var/lib/jenkins/jenkins.model.JenkinsLocationConfiguration.xml
+
+    # Αν δεις ότι σε ξανα-χτυπάει, άστο true (θα disable theme plugins)
+    disable_theme_plugins_if_detected: true
+
+    # Πιθανά theme plugins (αν υπάρχουν θα τα κάνει disable με .disabled)
+    theme_plugin_candidates:
+      - simple-theme-plugin
+      - dark-theme
+      - theme-manager
+      - theme
+      - material-theme
+      - dark
+
+  tasks:
+    - name: Get current external IP (GCP metadata, fallback to ipify/ifconfig)
+      shell: |
+        set -e
+        if curl -s -m 2 -H "Metadata-Flavor: Google" \
+          "http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip" >/dev/null; then
+          curl -s -H "Metadata-Flavor: Google" \
+            "http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip"
+          exit 0
+        fi
+        curl -s -m 3 https://api.ipify.org || curl -s -m 3 https://ifconfig.me
+      args:
+        executable: /bin/bash
+      register: ext_ip
+      changed_when: false
+
+    - name: Set desired Jenkins URL
+      set_fact:
+        desired_jenkins_url: "http://{{ ext_ip.stdout }}:{{ jenkins_port }}/"
+
+    - name: Ensure Jenkins location config exists
+      copy:
+        dest: "{{ location_xml }}"
+        owner: jenkins
+        group: jenkins
+        mode: "0644"
+        content: |
+          <?xml version='1.1' encoding='UTF-8'?>
+          <jenkins.model.JenkinsLocationConfiguration>
+            <jenkinsUrl>{{ desired_jenkins_url }}</jenkinsUrl>
+          </jenkins.model.JenkinsLocationConfiguration>
+      when: not (location_xml is exists)
+
+    - name: Update JenkinsLocationConfiguration jenkinsUrl
+      replace:
+        path: "{{ location_xml }}"
+        regexp: '(<jenkinsUrl>)[^<]*(</jenkinsUrl>)'
+        replace: '\1{{ desired_jenkins_url }}\2'
+      register: jenkins_url_changed
+
+    - name: Detect theme config files referencing old IP or theme-dark
+      shell: |
+        set -e
+        # Search only in top-level XML configs and plugin configs (fast)
+        grep -RIn --include="*.xml" -E "theme-dark|theme\.css|http://[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+:{{ jenkins_port }}/theme" "{{ jenkins_home }}" \
+          | head -n 200 || true
+      args:
+        executable: /bin/bash
+      register: theme_hits
+      changed_when: false
+
+    - name: Show theme hits (debug)
+      debug:
+        msg: "{{ theme_hits.stdout_lines | default([]) }}"
+
+    - name: Fix hardcoded old IP occurrences pointing to Jenkins port (best-effort replace to current IP)
+      shell: |
+        set -e
+        # Replace any http://<old-ip>:8080/ with current Jenkins URL in Jenkins home xml files
+        # (safe-ish because only xml; keeps rest same)
+        for f in $(grep -RIl --include="*.xml" -E "http://[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+:{{ jenkins_port }}/" "{{ jenkins_home }}" || true); do
+          sed -i -E "s|http://[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+:{{ jenkins_port }}/|{{ desired_jenkins_url }}|g" "$f"
+        done
+      args:
+        executable: /bin/bash
+      register: theme_rewrite
+      changed_when: theme_rewrite.rc == 0
+
+    - name: Optionally disable theme plugins if theme references were detected
+      when: disable_theme_plugins_if_detected and (theme_hits.stdout | length > 0)
+      block:
+        - name: Stop Jenkins before disabling plugins
+          service:
+            name: jenkins
+            state: stopped
+
+        - name: Disable theme plugins (create .jpi.disabled if plugin exists)
+          shell: |
+            set -e
+            for p in {{ theme_plugin_candidates | join(' ') }}; do
+              if [ -f "{{ jenkins_home }}/plugins/${p}.jpi" ]; then
+                touch "{{ jenkins_home }}/plugins/${p}.jpi.disabled"
+              fi
+            done
+          args:
+            executable: /bin/bash
+
+        - name: Start Jenkins after plugin disable
+          service:
+            name: jenkins
+            state: started
+
+    - name: Restart Jenkins if URL or theme rewrite changed (and not already restarted)
+      when: (jenkins_url_changed.changed or theme_rewrite.changed) and not (disable_theme_plugins_if_detected and (theme_hits.stdout | length > 0))
+      service:
+        name: jenkins
+        state: restarted
+
+    - name: Wait for Jenkins to respond
+      uri:
+        url: "http://127.0.0.1:{{ jenkins_port }}/login"
+        method: GET
+        status_code: 200
+      register: up
+      retries: 30
+      delay: 2
+      until: up.status == 200
+
+    - name: Final timing check
+      shell: curl -s -o /dev/null -w "CODE=%{http_code} TOTAL=%{time_total}\n" http://127.0.0.1:{{ jenkins_port }}/login
+      register: final_check
+      changed_when: false
+
+    - debug:
+        msg: "Jenkins /login (local): {{ final_check.stdout }}"

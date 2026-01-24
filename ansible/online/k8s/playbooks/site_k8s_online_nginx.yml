@@ -6,7 +6,7 @@
   become: true
 
   vars:
-    public_ip: "35.184.112.234"
+    public_ip: "{{ hostvars[inventory_hostname].ansible_host | default(ansible_host) }}"
     public_url: "http://{{ public_ip }}"
 
     public_fqdn: "ds2025.example.com"

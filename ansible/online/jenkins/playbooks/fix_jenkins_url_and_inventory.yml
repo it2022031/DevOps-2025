@@ -1,0 +1,108 @@
+---
+- name: Fix Jenkins URL + (optional) update repo inventory with current external IP
+  hosts: jenkins
+  become: true
+
+  vars:
+    jenkins_port: 8080
+    location_xml: /var/lib/jenkins/jenkins.model.JenkinsLocationConfiguration.xml
+
+    # Αν το repo σου είναι clone-αρισμένο στο Jenkins VM, βάλε εδώ το path.
+    # Από τα logs σου φαίνεται ότι το workspace είναι κάτω από /var/lib/jenkins/workspace/<job>
+    # Καλύτερα όμως να έχεις ΕΝΑ σταθερό clone, π.χ. /opt/DevOps-2025.
+    repo_dir: /opt/DevOps-2025
+    inventory_file: "{{ repo_dir }}/infra/inventories/cloud_jenkins.ini"
+
+    # Θες να ενημερώνει και το repo inventory;
+    update_repo_inventory: true
+
+  tasks:
+    - name: Ensure repo dir exists (optional)
+      stat:
+        path: "{{ repo_dir }}"
+      register: repo_stat
+
+    - name: Get current external IP (best-effort via metadata / fallback)
+      shell: |
+        set -e
+        # GCP metadata (works on GCE)
+        if curl -s -m 2 -H "Metadata-Flavor: Google" \
+          "http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip" >/dev/null; then
+          curl -s -H "Metadata-Flavor: Google" \
+            "http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip"
+          exit 0
+        fi
+        # Fallback (public IP services)
+        curl -s -m 3 https://api.ipify.org || curl -s -m 3 https://ifconfig.me
+      args:
+        executable: /bin/bash
+      register: ext_ip
+      changed_when: false
+
+    - name: Set current Jenkins URL
+      set_fact:
+        desired_jenkins_url: "http://{{ ext_ip.stdout }}:{{ jenkins_port }}/"
+
+    - name: Show desired Jenkins URL
+      debug:
+        msg: "Desired Jenkins URL: {{ desired_jenkins_url }}"
+
+    - name: Ensure location config file exists (create if missing)
+      copy:
+        dest: "{{ location_xml }}"
+        owner: jenkins
+        group: jenkins
+        mode: "0644"
+        content: |
+          <?xml version='1.1' encoding='UTF-8'?>
+          <jenkins.model.JenkinsLocationConfiguration>
+            <jenkinsUrl>{{ desired_jenkins_url }}</jenkinsUrl>
+          </jenkins.model.JenkinsLocationConfiguration>
+      when: not lookup('ansible.builtin.fileglob', location_xml, errors='ignore')
+
+    - name: Update JenkinsLocationConfiguration jenkinsUrl
+      replace:
+        path: "{{ location_xml }}"
+        regexp: '(<jenkinsUrl>)[^<]*(</jenkinsUrl>)'
+        replace: '\1{{ desired_jenkins_url }}\2'
+      register: loc_changed
+
+    - name: Update repo inventory cloud_jenkins.ini (if enabled and repo exists)
+      when: update_repo_inventory and repo_stat.stat.exists
+      block:
+        - name: Ensure inventory file exists
+          stat:
+            path: "{{ inventory_file }}"
+          register: inv_stat
+
+        - name: Update 'jenkins ansible_host=' line with current IP
+          lineinfile:
+            path: "{{ inventory_file }}"
+            regexp: '^jenkins\s+ansible_host='
+            line: "jenkins ansible_host={{ ext_ip.stdout }} ansible_user=tefkros"
+          when: inv_stat.stat.exists
+
+    - name: Restart Jenkins if Location config changed
+      service:
+        name: jenkins
+        state: restarted
+      when: loc_changed.changed
+
+    - name: Wait for Jenkins login endpoint
+      uri:
+        url: "http://127.0.0.1:{{ jenkins_port }}/login"
+        method: GET
+        status_code: 200
+        return_content: false
+      register: jenkins_up
+      retries: 30
+      delay: 2
+      until: jenkins_up.status == 200
+
+    - name: Final check (show HTTP status)
+      shell: curl -s -o /dev/null -w "CODE=%{http_code} TOTAL=%{time_total}\n" http://127.0.0.1:{{ jenkins_port }}/login
+      register: final_check
+      changed_when: false
+
+    - debug:
+        msg: "Jenkins local /login: {{ final_check.stdout }}"
