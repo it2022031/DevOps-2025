@@ -53,3 +53,20 @@ pipelineJob('deploy-k8s-online-nginx') {
         }
     }
 }
+pipelineJob('deploy-docker-online-nginx') {
+    definition {
+        cpsScm {
+            scm {
+                git {
+                    remote {
+                        url(repoUrl)
+                        if (gitCreds) { credentials(gitCreds) }
+                    }
+                    branches(branch)
+                }
+            }
+            scriptPath('ci/jenkins/jenkinsfiles/deploy_docker_online_nginx.groovy')
+            lightweight(true)
+        }
+    }
+}

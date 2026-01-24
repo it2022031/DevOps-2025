@@ -13,7 +13,8 @@
     compose_dir: "{{ project_dir }}/ansible/docker"
 
     # ONLINE public URL (βάλε FQDN όταν το έχεις, προς το παρόν IP)
-    public_url: "http://34.170.9.226"
+    public_ip: "{{ hostvars[inventory_hostname].ansible_host | default(ansible_host) }}"
+    public_url: "http://{{ public_ip }}"
 
     # Certbot (θα δουλέψει όταν έχεις DNS σωστό + 80/443 open)
     public_fqdn: "ds2025.example.com"
@@ -49,9 +50,9 @@
       shell: |
         set -e
         cd "{{ compose_dir }}"
-        sed -i 's|APP_PUBLIC_BASE_URL: "http://127.0.0.1:8081"|APP_PUBLIC_BASE_URL: "{{ public_url }}"|g' docker-compose.yml
-        sed -i 's|APP_FRONTEND_URL: "http://127.0.0.1:8081"|APP_FRONTEND_URL: "{{ public_url }}"|g' docker-compose.yml
-        grep -n 'APP_PUBLIC_BASE_URL\|APP_FRONTEND_URL' docker-compose.yml
+        sed -i -E 's|APP_PUBLIC_BASE_URL:\s*\"[^\"]+\"|APP_PUBLIC_BASE_URL: "{{ public_url }}"|g' docker-compose.yml
+        sed -i -E 's|APP_FRONTEND_URL:\s*\"[^\"]+\"|APP_FRONTEND_URL: "{{ public_url }}"|g' docker-compose.yml
+        grep -n 'APP_PUBLIC_BASE_URL|APP_FRONTEND_URL' docker-compose.yml
       args:
         executable: /bin/bash
       changed_when: true
