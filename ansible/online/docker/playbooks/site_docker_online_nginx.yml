@@ -1,8 +1,8 @@
----
-# 1) Install Docker on docker_nodes using your existing playbook (TOP-LEVEL)
+# Επαναχρησιμοποιούμε (import) το playbook εγκατάστασης Docker από την τοπική υλοποίηση (Vagrant/VirtualBox),
+# ώστε να εφαρμόζουμε την ίδια δοκιμασμένη διαδικασία setup και στα cloud VMs.
 - import_playbook: ../../../docker/playbooks/install_docker.yml
 
-# 2) Online deploy (clone repo -> compose up) + Nginx/Certbot
+# Online διαδικασία: clone του repo, docker compose up, ρύθμιση Nginx + (best-effort) HTTPS μέσω Certbot/Let's Encrypt.
 - name: ONLINE Docker deploy (clone repo -> compose up) + HTTPS via Nginx/Certbot
   hosts: docker_nodes
   become: true
@@ -12,22 +12,26 @@
     project_dir: /opt/DevOps-2025
     compose_dir: "{{ project_dir }}/ansible/docker"
 
-    # ONLINE public URL (βάλε FQDN όταν το έχεις, προς το παρόν IP)
+    # Παίρνουμε το public IP από το inventory (ansible_host). Αν δεν έχει οριστεί, χρησιμοποιείται το ansible_host.
+    # Το public_url χρησιμοποιείται ως βάση (base URL) και περνά ως env στα containers (backend/front).
     public_ip: "{{ hostvars[inventory_hostname].ansible_host | default(ansible_host) }}"
     public_url: "http://{{ public_ip }}"
 
-    # Certbot (θα δουλέψει όταν έχεις DNS σωστό + 80/443 open)
+    # Certbot / Let's Encrypt:
+    # Η έκδοση/ανανέωση πιστοποιητικού θα πετύχει μόνο αν το DNS του FQDN δείχνει στο VM και είναι ανοιχτά τα ports 80/443.
     public_fqdn: "ds2025.example.com"
     letsencrypt_email: "you@example.com"
     nginx_site: "ds2025-online"
 
   tasks:
+    # Εγκαθιστούμε τα απαραίτητα πακέτα για το deployment (git για clone, curl για δοκιμές/λήψεις, CA certificates).
     - name: Install prerequisites
       apt:
         name: [git, curl, ca-certificates]
         state: present
         update_cache: yes
 
+    # Κάνουμε clone/update το repo ώστε να έχουμε διαθέσιμα τα αρχεία του docker-compose και τα templates.
     - name: Clone/update DevOps-2025 repo
       git:
         repo: "{{ repo_url }}"
@@ -35,32 +39,43 @@
         version: main
         force: yes
 
+    # Ελέγχουμε ότι το docker-compose.yml υπάρχει στο αναμενόμενο path πριν συνεχίσουμε.
     - name: Ensure docker-compose.yml exists in repo
       stat:
         path: "{{ compose_dir }}/docker-compose.yml"
       register: dc
 
+    # Αν λείπει το docker-compose.yml, σταματάμε άμεσα με σαφές μήνυμα σφάλματος.
     - name: Fail if docker-compose.yml missing
       fail:
         msg: "Missing docker-compose.yml at {{ compose_dir }}/docker-compose.yml"
       when: not dc.stat.exists
 
-    # IMPORTANT: compose has hardcoded 127.0.0.1:8081, so patch it for ONLINE
+    # Στο τοπικό περιβάλλον υπήρχαν hard-coded URLs στο docker-compose.
+    # Εδώ κάνουμε patch ώστε τα APP_PUBLIC_BASE_URL / APP_FRONTEND_URL να δείχνουν στο public URL του VM (online),
+    # για να αποφευχθούν λάθος redirects, σπασμένα links και πιθανά CORS προβλήματα.
     - name: Patch docker-compose.yml (APP_PUBLIC_BASE_URL / APP_FRONTEND_URL) for ONLINE
+      # Χρησιμοποιούμε shell για να κάνουμε επιτόπου αντικατάσταση τιμών στο docker-compose.yml.
       shell: |
+        # Τερματίζουμε το script αν υπάρξει σφάλμα σε κρίσιμη εντολή (εκτός από ό,τι έχει "|| true").
         set -e
         cd "{{ compose_dir }}"
 
-        # patch (αν υπάρχουν)
+        # Αντικαθιστούμε την τιμή του APP_PUBLIC_BASE_URL  με το online public URL.
         sed -i -E 's|APP_PUBLIC_BASE_URL:\s*"[^\"]*"|APP_PUBLIC_BASE_URL: "{{ public_url }}"|g' docker-compose.yml || true
+
+        # Αντικαθιστούμε την τιμή του APP_FRONTEND_URL  με το ίδιο online public URL.
         sed -i -E 's|APP_FRONTEND_URL:\s*"[^\"]*"|APP_FRONTEND_URL: "{{ public_url }}"|g' docker-compose.yml || true
 
+        # Εμφανίζουμε τις τελικές γραμμές  για επιβεβαίωση/Debug.
         echo "== After patch (if keys exist) =="
         grep -nE 'APP_PUBLIC_BASE_URL|APP_FRONTEND_URL' docker-compose.yml || true
       args:
         executable: /bin/bash
       changed_when: true
 
+    # Εκκίνηση όλων των services με docker compose.
+    # Χρησιμοποιούμε --force-recreate ώστε να αναδημιουργηθούν τα containers και να εφαρμοστούν σίγουρα τα νέα env vars.
     - name: Compose up (force recreate so env changes apply)
       shell: |
         set -e
@@ -70,62 +85,78 @@
         executable: /bin/bash
       changed_when: true
 
+    # Debug/έλεγχος: επιβεβαιώνουμε ότι το backend container έχει πράγματι πάρει τα env vars μετά το recreate.
     - name: Show backend env from container (debug)
       shell: |
         set -e
         docker exec docker-backend-1 printenv | egrep 'APP_PUBLIC_BASE_URL|APP_FRONTEND_URL' || true
       changed_when: false
 
-    # --- Nginx + Certbot (HTTPS) ---
+    # Εγκατάσταση Nginx και Certbot (με Nginx plugin) για reverse proxy και δυνατότητα αυτόματου HTTPS setup.
     - name: Install nginx + certbot
       apt:
         name: [nginx, certbot, python3-certbot-nginx]
         state: present
         update_cache: yes
 
+    # Δημιουργούμε webroot directory που μπορεί να αξιοποιηθεί σε ACME challenge ρυθμίσεις.
     - name: Create webroot for certbot
       file:
         path: /var/www/certbot
         state: directory
         mode: "0755"
 
+    # Γράφουμε το Nginx vhost configuration  από template ώστε να σερβίρει/προωθεί την εφαρμογή (reverse proxy).
     - name: Write nginx vhost (HTTP)
       template:
         src: ../../nginx/templates/ds2025_docker.conf.j2
         dest: "/etc/nginx/sites-available/{{ nginx_site }}"
         mode: "0644"
 
+    # Ενεργοποιούμε το site (symlink σε sites-enabled) ώστε να το φορτώσει ο Nginx.
     - name: Enable nginx site
       file:
         src: "/etc/nginx/sites-available/{{ nginx_site }}"
         dest: "/etc/nginx/sites-enabled/{{ nginx_site }}"
         state: link
 
+    # Απενεργοποιούμε το default site.
     - name: Disable default site
       file:
         path: /etc/nginx/sites-enabled/default
         state: absent
 
+    # Έλεγχος εγκυρότητας του Nginx configuration πριν το restart (fail-fast σε σφάλματα config).
     - name: Validate nginx config
       command: nginx -t
       changed_when: false
 
+    # Restart και enable του Nginx ώστε να εφαρμοστούν οι αλλαγές και να ενεργοποιηθεί το reverse proxy.
     - name: Restart nginx
       service:
         name: nginx
         state: restarted
         enabled: yes
 
+    # Προσπαθούμε να εκδώσουμε/ανανεώσουμε πιστοποιητικό Let's Encrypt.
+    # Δεν αποτυγχάνουμε το playbook αν το domain/DNS δεν είναι ακόμη έτοιμο (best-effort).
     - name: Try obtain/renew LetsEncrypt cert (won't fail if domain not ready)
       command: >
+        # Χρησιμοποιούμε τον Nginx plugin ώστε ο Certbot να κάνει validation και να ρυθμίσει αυτόματα SSL στο vhost.
         certbot --nginx -n
         --agree-tos
+        # Email επικοινωνίας για ειδοποιήσεις/λήξεις/ανανεώσεις πιστοποιητικού.
         -m {{ letsencrypt_email }}
+        # Το FQDN για το οποίο ζητάμε πιστοποιητικό (π.χ. ds2025.example.com).
         -d {{ public_fqdn }}
+      # Κρατάμε το output της εντολής για ενημέρωση/έλεγχο στα επόμενα tasks.
       register: certbot_out
+      # Το task θεωρείται "changed" μόνο αν εκδόθηκε νέο cert ("Congratulations") ή ανανεώθηκε υπάρχον ("renewed").
       changed_when: "'Congratulations' in certbot_out.stdout or 'renewed' in certbot_out.stdout"
+      # Αν αποτύχει (π.χ. DNS/ports δεν είναι έτοιμα), δεν “ρίχνουμε” το deploy.
       failed_when: false
 
+    # Εμφανίζουμε το output του certbot για troubleshooting και τεκμηρίωση.
     - name: Show certbot output (info)
       debug:
         var: certbot_out.stdout_lines
