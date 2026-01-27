@@ -1,78 +1,78 @@
----
-- name: Install Jenkins (LTS) with Java 21 on Jenkins VM (cloud-safe)
-  hosts: jenkins
-  become: true
-
-  vars:
-    jenkins_url: "http://{{ hostvars[inventory_hostname].ansible_host }}:8080"
-    jenkins_login_url: "{{ jenkins_url }}/login"
-
-    jenkins_keyring: /etc/apt/keyrings/jenkins.gpg
-    jenkins_list: /etc/apt/sources.list.d/jenkins.list
-
-  tasks:
-    # --- Precheck: Jenkins already running (skip install) ---
-    - name: Precheck Jenkins service active
-      shell: "systemctl is-active --quiet jenkins && echo active || echo inactive"
-      register: jenkins_active
-      changed_when: false
-      failed_when: false
-
-    - name: Precheck Jenkins port 8080 listening
-      shell: "ss -lntp | grep -q ':8080' && echo listening || echo not_listening"
-      register: jenkins_listen
-      changed_when: false
-      failed_when: false
-
-    - name: Skip install if Jenkins is already healthy
-      meta: end_play
-      when: jenkins_active.stdout.strip() == 'active' and jenkins_listen.stdout.strip() == 'listening'
-
-    # -------------------------------------------------------------------------
-    # IMPORTANT FIX:
-    # If Jenkins repo is already present but its GPG key isn't, ANY apt update
-    # will fail. So we remove the repo first, then do prerequisites, then re-add.
-    # -------------------------------------------------------------------------
-
-    - name: Remove old Jenkins repo list/key artifacts BEFORE any apt update
-      file:
-        path: "{{ item }}"
-        state: absent
-      loop:
-        - "{{ jenkins_list }}"
-        - /etc/apt/keyrings/jenkins-keyring.asc
-        - "{{ jenkins_keyring }}"
-      ignore_errors: true
-
-    - name: Ensure keyrings directory exists
-      file:
-        path: /etc/apt/keyrings
-        state: directory
-        mode: "0755"
-
-    - name: apt update (safe after removing broken Jenkins repo)
-      command: apt-get update
-      changed_when: false
-
-    - name: Install minimal prerequisites for adding Jenkins repo + Java 21
-      apt:
-        name:
-          - ca-certificates
-          - curl
-          - gnupg
-          - apt-transport-https
-          - openjdk-21-jre
-        state: present
-        update_cache: yes
-
-    # --- Add Jenkins repo + key correctly ---
-    - name: Install Jenkins repo key (dearmored .gpg keyring)
-      shell: |
-        set -e
-        curl -fsSL https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key \
-          | gpg --dearmor -o "{{ jenkins_keyring }}"
-        chmod 0644 "{{ jenkins_keyring }}"
-      args:
-        creates: "{{ jenkins_keyring }}"
-
-    - name: Add Jenkin
+#---
+#- name: Install Jenkins (LTS) with Java 21 on Jenkins VM (cloud-safe)
+#  hosts: jenkins
+#  become: true
+#
+#  vars:
+#    jenkins_url: "http://{{ hostvars[inventory_hostname].ansible_host }}:8080"
+#    jenkins_login_url: "{{ jenkins_url }}/login"
+#
+#    jenkins_keyring: /etc/apt/keyrings/jenkins.gpg
+#    jenkins_list: /etc/apt/sources.list.d/jenkins.list
+#
+#  tasks:
+#    # --- Precheck: Jenkins already running (skip install) ---
+#    - name: Precheck Jenkins service active
+#      shell: "systemctl is-active --quiet jenkins && echo active || echo inactive"
+#      register: jenkins_active
+#      changed_when: false
+#      failed_when: false
+#
+#    - name: Precheck Jenkins port 8080 listening
+#      shell: "ss -lntp | grep -q ':8080' && echo listening || echo not_listening"
+#      register: jenkins_listen
+#      changed_when: false
+#      failed_when: false
+#
+#    - name: Skip install if Jenkins is already healthy
+#      meta: end_play
+#      when: jenkins_active.stdout.strip() == 'active' and jenkins_listen.stdout.strip() == 'listening'
+#
+#    # -------------------------------------------------------------------------
+#    # IMPORTANT FIX:
+#    # If Jenkins repo is already present but its GPG key isn't, ANY apt update
+#    # will fail. So we remove the repo first, then do prerequisites, then re-add.
+#    # -------------------------------------------------------------------------
+#
+#    - name: Remove old Jenkins repo list/key artifacts BEFORE any apt update
+#      file:
+#        path: "{{ item }}"
+#        state: absent
+#      loop:
+#        - "{{ jenkins_list }}"
+#        - /etc/apt/keyrings/jenkins-keyring.asc
+#        - "{{ jenkins_keyring }}"
+#      ignore_errors: true
+#
+#    - name: Ensure keyrings directory exists
+#      file:
+#        path: /etc/apt/keyrings
+#        state: directory
+#        mode: "0755"
+#
+#    - name: apt update (safe after removing broken Jenkins repo)
+#      command: apt-get update
+#      changed_when: false
+#
+#    - name: Install minimal prerequisites for adding Jenkins repo + Java 21
+#      apt:
+#        name:
+#          - ca-certificates
+#          - curl
+#          - gnupg
+#          - apt-transport-https
+#          - openjdk-21-jre
+#        state: present
+#        update_cache: yes
+#
+#    # --- Add Jenkins repo + key correctly ---
+#    - name: Install Jenkins repo key (dearmored .gpg keyring)
+#      shell: |
+#        set -e
+#        curl -fsSL https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key \
+#          | gpg --dearmor -o "{{ jenkins_keyring }}"
+#        chmod 0644 "{{ jenkins_keyring }}"
+#      args:
+#        creates: "{{ jenkins_keyring }}"
+#
+#    - name: Add Jenkin

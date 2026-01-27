@@ -17,12 +17,13 @@
     local_manifests_dir: "{{ playbook_dir }}/../../../k8s/manifests"
     remote_manifests_dir: "/opt/ds2025-manifests"
 
+    # Φωτογραφίες (hostPath για Postgres): αντιγραφή στο cloud VM για να υπάρχουν τοπικά στο node
     cloud_photos_dir: "/opt/ds2025-photos"
     local_photos_dir: "{{ playbook_dir }}/../../../../data/sqlData/photos"
 
-    # ✅ MailHog public ports (NodePort)
+    # MailHog public ports (NodePort) για πρόσβαση απ' έξω χωρίς port-forward
     mailhog_nodeport_http: 30025   # UI + API (8025)
-    mailhog_nodeport_smtp: 31025   # SMTP (1025) - προαιρετικό
+    mailhog_nodeport_smtp: 31025   # SMTP (1025)
 
   tasks:
     - name: Sanity check manifests exist on controller
@@ -43,13 +44,15 @@
       shell: microk8s status --wait-ready
       changed_when: false
 
+    # Φτιάχνουμε φάκελο στο VM για να ανεβάσουμε τα manifests
     - name: Create remote manifests dir
       file:
         path: "{{ remote_manifests_dir }}"
         state: directory
         mode: "0755"
 
-    - name: Ensure ansible remote tmp exists (avoid permission issues)
+
+    - name: Ensure ansible remote tmp exists
       file:
         path: /tmp/.ansible-cloud/tmp
         state: directory
@@ -61,7 +64,7 @@
         dest: "{{ remote_manifests_dir }}/"
         mode: "0644"
 
-    - name: Ensure cloud photos dir exists (replaces /vagrant/... path)
+    - name: Ensure cloud photos dir exists
       file:
         path: "{{ cloud_photos_dir }}"
         state: directory
@@ -93,6 +96,7 @@
         ls -la "{{ cloud_photos_dir }}"
       changed_when: true
 
+    # Εδώ κάνουμε patch στο manifest ώστε το hostPath να δείχνει στο σωστό directory του cloud node.
     - name: Patch postgres manifest hostPath (replace /vagrant/... with cloud path)
       shell: |
         set -e
@@ -112,7 +116,6 @@
         microk8s kubectl apply -f "{{ remote_manifests_dir }}/60-ingress.yml"
       changed_when: true
 
-    # ✅ Make MailHog permanently reachable from outside (no port-forward needed)
     - name: Expose MailHog via NodePort (public)
       shell: |
         set -e
@@ -151,6 +154,10 @@
         microk8s kubectl -n ds2025 rollout status deploy/frontend --timeout=300s
       changed_when: false
 
+    # Κάνουμε patch env variables στο backend deployment μέσα στο Kubernetes για ONLINE URLs:
+    # - APP_PUBLIC_BASE_URL / APP_FRONTEND_URL: χρησιμοποιούνται σε links και redirects
+    # - CORS_ALLOWED_ORIGINS: επιτρέπει requests από το public URL
+    # Μετά κάνουμε restart το deployment για να εφαρμοστούν οι νέες env τιμές.
     - name: Patch backend env for ONLINE URLs (activation links + CORS)
       shell: |
         set -e
@@ -168,6 +175,7 @@
         state: present
         update_cache: yes
 
+    # Nginx vhost κάνει reverse proxy προς το cluster (app) και εκθέτει και /mailhog paths
     - name: Deploy nginx vhost (app + /mailhog/)
       template:
         src: ../../../online/nginx/templates/ds2025_k8s.conf.j2
@@ -195,6 +203,7 @@
         state: restarted
         enabled: yes
 
+    # Best-effort έκδοση/ανανέωση πιστοποιητικού Let's Encrypt μέσω Certbot (δεν αποτυγχάνει το deploy αν DNS δεν είναι έτοιμο)
     - name: Try obtain LetsEncrypt cert (best effort; needs DNS)
       command: >
         certbot --nginx -n

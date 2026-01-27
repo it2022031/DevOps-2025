@@ -23,13 +23,13 @@
       debug:
         msg: "property_photos count = {{ photo_count.stdout | default('0') }}"
 
-    # 🔒 Αν υπάρχουν ήδη φωτογραφίες → ΤΕΛΟΣ
+
     - name: Skip loading photos if already present
       debug:
         msg: "Photos already loaded, skipping import."
       when: photo_count.stdout | int > 0
 
-    # ⬇️ ΟΛΑ τα παρακάτω τρέχουν ΜΟΝΟ αν δεν υπάρχουν φωτογραφίες
+    #  ΟΛΑ τα παρακάτω τρέχουν ΜΟΝΟ αν δεν υπάρχουν φωτογραφίες
     - block:
 
         - name: Copy load_photos.sql
@@ -46,13 +46,15 @@
 
         - name: Prepare /photos symlinks expected by SQL
           shell: |
+            # Σταματάμε αν υπάρξει σφάλμα
             set -e
-
             rm -rf /photos
             mkdir -p /photos
 
+            # Βεβαιωνόμαστε ότι υπάρχει ο φάκελος avatar_photos
             test -d "{{ remote_photos }}/avatar_photos"
 
+            # Εντοπίζουμε τον φάκελο property_photos (με ή χωρίς trailing space)
             if [ -d "{{ remote_photos }}/property_photos" ]; then
               PROP="{{ remote_photos }}/property_photos"
             elif [ -d "{{ remote_photos }}/property_photos " ]; then
@@ -62,16 +64,21 @@
               exit 1
             fi
 
+            # Δημιουργούμε symlinks ώστε το SQL να βρει τις φωτογραφίες στα paths που περιμένει
             ln -s "{{ remote_photos }}/avatar_photos" /photos/avatar_photos
             ln -s "$PROP" /photos/property_photos
 
+            # Έλεγχος του τελικού αποτελέσματος
             ls -la /photos
           args:
             executable: /bin/bash
 
+
         - name: Run load_photos.sql as postgres
           shell: |
+            # Αυστηρή εκτέλεση: σταματάμε σε οποιοδήποτε σφάλμα
             set -euo pipefail
+            # Εκτελούμε το SQL αρχείο ως χρήστης postgres
             sudo -u postgres bash -lc "
               cd /tmp &&
               psql -d '{{ db_name }}' -v ON_ERROR_STOP=1 -f '{{ remote_sql }}'

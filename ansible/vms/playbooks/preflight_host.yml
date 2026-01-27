@@ -8,6 +8,8 @@
     critical_ports: "1025|8025|8081|5432|9000|9001"
 
   tasks:
+    # Προληπτικός έλεγχος στον host πριν το deployment
+    # Βλέπουμε αν τρέχουν ήδη Docker containers που μπορεί να δεσμεύουν θύρες
     - name: List running docker containers (if docker exists)
       shell: |
         command -v docker >/dev/null 2>&1 && docker ps --format '{{"{{"}}.Names{{"}}"}}\t{{"{{"}}.Ports{{"}}"}}' || true
@@ -16,6 +18,8 @@
       register: docker_running
       changed_when: false
 
+    # Αν βρεθούν ενεργά containers, σταματάμε τη διαδικασία
+    # ώστε να αποφευχθούν conflicts με forwarded ports
     - name: Fail if docker containers are running (ports may conflict)
       fail:
         msg: |
@@ -24,7 +28,7 @@
           {{ docker_running.stdout }}
       when: docker_running.stdout != ""
 
-    # (Optional) quick visibility: show what is listening anyway
+    # εμφανίζουμε ποιες  θύρες είναι ήδη σε χρήση
     - name: Show listeners on critical ports (info)
       shell: |
         ss -lntp | egrep ":({{ critical_ports }})" || true

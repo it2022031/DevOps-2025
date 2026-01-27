@@ -1,13 +1,14 @@
----
 - name: Ensure DS2025 hostnames resolve
   hosts: vms
   become: true
   tasks:
+    # Προσθέτουμε/ενημερώνουμε εγγραφές στο  ώστε τα VM να "βλέπουν" το ένα το άλλο με ονόματα (backend/db/front)
     - name: Add DS2025 entries to /etc/hosts
       blockinfile:
         path: /etc/hosts
         marker: "# {mark} DS2025"
         block: |
+          # Αν υπάρχει private_ip το χρησιμοποιούμε, αλλιώς πέφτουμε στο ansible_host
           {{ (hostvars['backend'].private_ip | default(hostvars['backend'].ansible_host)) }} backend
           {{ (hostvars['db'].private_ip | default(hostvars['db'].ansible_host)) }} db
           {{ (hostvars['front'].private_ip | default(hostvars['front'].ansible_host)) }} front

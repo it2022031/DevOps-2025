@@ -1,9 +1,8 @@
 # Επαναχρησιμοποιούμε (import) το playbook εγκατάστασης Docker από την τοπική υλοποίηση (Vagrant/VirtualBox),
-# ώστε να εφαρμόζουμε την ίδια δοκιμασμένη διαδικασία setup και στα cloud VMs.
 - import_playbook: ../../../docker/playbooks/install_docker.yml
 
-# Online διαδικασία: clone του repo, docker compose up, ρύθμιση Nginx + (best-effort) HTTPS μέσω Certbot/Let's Encrypt.
-- name: ONLINE Docker deploy (clone repo -> compose up) + HTTPS via Nginx/Certbot
+
+- name: Docker deploy (clone repo -> compose up) + HTTPS via Nginx/Certbot
   hosts: docker_nodes
   become: true
 
@@ -13,25 +12,24 @@
     compose_dir: "{{ project_dir }}/ansible/docker"
 
     # Παίρνουμε το public IP από το inventory (ansible_host). Αν δεν έχει οριστεί, χρησιμοποιείται το ansible_host.
-    # Το public_url χρησιμοποιείται ως βάση (base URL) και περνά ως env στα containers (backend/front).
     public_ip: "{{ hostvars[inventory_hostname].ansible_host | default(ansible_host) }}"
     public_url: "http://{{ public_ip }}"
 
-    # Certbot / Let's Encrypt:
-    # Η έκδοση/ανανέωση πιστοποιητικού θα πετύχει μόνο αν το DNS του FQDN δείχνει στο VM και είναι ανοιχτά τα ports 80/443.
+    # Certbot :
+    # Η έκδοση/ανανέωση πιστοποιητικού θα πετύχει μόνο αν το DNS του FQDN δείχνει στο VM
     public_fqdn: "ds2025.example.com"
     letsencrypt_email: "you@example.com"
     nginx_site: "ds2025-online"
 
   tasks:
-    # Εγκαθιστούμε τα απαραίτητα πακέτα για το deployment (git για clone, curl για δοκιμές/λήψεις, CA certificates).
+    # Εγκαθιστούμε τα απαραίτητα πακέτα (git για clone, curl για δοκιμές/λήψεις, CA certificates).
     - name: Install prerequisites
       apt:
         name: [git, curl, ca-certificates]
         state: present
         update_cache: yes
 
-    # Κάνουμε clone/update το repo ώστε να έχουμε διαθέσιμα τα αρχεία του docker-compose και τα templates.
+
     - name: Clone/update DevOps-2025 repo
       git:
         repo: "{{ repo_url }}"
@@ -39,13 +37,13 @@
         version: main
         force: yes
 
-    # Ελέγχουμε ότι το docker-compose.yml υπάρχει στο αναμενόμενο path πριν συνεχίσουμε.
+
     - name: Ensure docker-compose.yml exists in repo
       stat:
         path: "{{ compose_dir }}/docker-compose.yml"
       register: dc
 
-    # Αν λείπει το docker-compose.yml, σταματάμε άμεσα με σαφές μήνυμα σφάλματος.
+
     - name: Fail if docker-compose.yml missing
       fail:
         msg: "Missing docker-compose.yml at {{ compose_dir }}/docker-compose.yml"
@@ -74,7 +72,7 @@
         executable: /bin/bash
       changed_when: true
 
-    # Εκκίνηση όλων των services με docker compose.
+
     # Χρησιμοποιούμε --force-recreate ώστε να αναδημιουργηθούν τα containers και να εφαρμοστούν σίγουρα τα νέα env vars.
     - name: Compose up (force recreate so env changes apply)
       shell: |
@@ -85,8 +83,8 @@
         executable: /bin/bash
       changed_when: true
 
-    # Debug/έλεγχος: επιβεβαιώνουμε ότι το backend container έχει πράγματι πάρει τα env vars μετά το recreate.
-    - name: Show backend env from container (debug)
+
+    - name: Show backend env from container
       shell: |
         set -e
         docker exec docker-backend-1 printenv | egrep 'APP_PUBLIC_BASE_URL|APP_FRONTEND_URL' || true
@@ -113,7 +111,7 @@
         dest: "/etc/nginx/sites-available/{{ nginx_site }}"
         mode: "0644"
 
-    # Ενεργοποιούμε το site (symlink σε sites-enabled) ώστε να το φορτώσει ο Nginx.
+
     - name: Enable nginx site
       file:
         src: "/etc/nginx/sites-available/{{ nginx_site }}"
@@ -126,7 +124,7 @@
         path: /etc/nginx/sites-enabled/default
         state: absent
 
-    # Έλεγχος εγκυρότητας του Nginx configuration πριν το restart (fail-fast σε σφάλματα config).
+
     - name: Validate nginx config
       command: nginx -t
       changed_when: false
@@ -153,10 +151,10 @@
       register: certbot_out
       # Το task θεωρείται "changed" μόνο αν εκδόθηκε νέο cert ("Congratulations") ή ανανεώθηκε υπάρχον ("renewed").
       changed_when: "'Congratulations' in certbot_out.stdout or 'renewed' in certbot_out.stdout"
-      # Αν αποτύχει (π.χ. DNS/ports δεν είναι έτοιμα), δεν “ρίχνουμε” το deploy.
+      # Αν αποτύχει δεν “ρίχνουμε” το deploy.
       failed_when: false
 
-    # Εμφανίζουμε το output του certbot για troubleshooting και τεκμηρίωση.
-    - name: Show certbot output (info)
+
+    - name: Show certbot output
       debug:
         var: certbot_out.stdout_lines

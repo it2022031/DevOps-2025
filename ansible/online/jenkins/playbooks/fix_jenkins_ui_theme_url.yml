@@ -8,7 +8,6 @@
     jenkins_home: /var/lib/jenkins
     location_xml: /var/lib/jenkins/jenkins.model.JenkinsLocationConfiguration.xml
 
-    # Αν δεις ότι σε ξανα-χτυπάει, άστο true (θα disable theme plugins)
     disable_theme_plugins_if_detected: true
 
     # Πιθανά theme plugins (αν υπάρχουν θα τα κάνει disable με .disabled)

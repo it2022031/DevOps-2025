@@ -1,17 +1,18 @@
 server {
 listen 80;
+# Catch-all vhost: πιάνει requests που δεν ταιριάζουν σε άλλο server_name (π.χ. πρόσβαση με IP)
 server_name _;
 
-# ----------------------------
+
 # MailHog API (explicit)
-# ----------------------------
 location ^~ /mailhog/api/ {
 add_header X-Debug-Where "mailhog-api" always;
 add_header X-Debug-Uri $request_uri always;
 
-# strip /mailhog prefix so MailHog sees /api/...
+# Αφαιρούμε το prefix /mailhog
 rewrite ^/mailhog/(.*)$ /$1 break;
 
+# Προώθηση προς MailHog (UI/API) που ακούει τοπικά στο 18025
 proxy_pass http://127.0.0.1:18025;
 proxy_set_header Host $host;
 proxy_set_header X-Real-IP $remote_addr;
@@ -22,14 +23,12 @@ proxy_http_version 1.1;
 proxy_buffering off;
 }
 
-# ----------------------------
 # MailHog UI
-# ----------------------------
 location ^~ /mailhog/ {
 add_header X-Debug-Where "mailhog-ui" always;
 add_header X-Debug-Uri $request_uri always;
 
-# strip /mailhog prefix so MailHog sees /
+# Αφαιρούμε το prefix /mailhog ώστε ο MailHog UI να δει το σωστό path (ρίζα /)
 rewrite ^/mailhog/(.*)$ /$1 break;
 
 proxy_pass http://127.0.0.1:18025;
@@ -48,6 +47,7 @@ proxy_buffering off;
 location / {
 add_header X-Debug-Where "main-app" always;
 
+# Default προώθηση για οτιδήποτε δεν είναι /mailhog/ (κύρια εφαρμογή)
 proxy_pass http://127.0.0.1:80;
 proxy_set_header Host $host;
 proxy_set_header X-Real-IP $remote_addr;

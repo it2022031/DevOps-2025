@@ -1,9 +1,9 @@
 ---
-# 0) Preflight + hosts map (keeps backend/db/front names resolving)
+# Preflight + hosts map (ώστε να μην έχουμε conflicts και να λύνουν τα ονόματα backend/db/front)
 - import_playbook: ../../../vms/playbooks/preflight_host.yml
 - import_playbook: ../../../common/playbooks/hosts_map.yml
 
-# 1) Common prep on the VM(s)
+# Κοινή προετοιμασία σε όλα τα VMs (δημιουργία ansible tmp για να μην υπάρχουν θέματα με Jenkins/permissions)
 - name: Common prep on all VMs (single box via inventory hack)
   hosts: vms
   become: true
@@ -14,11 +14,12 @@
         state: directory
         mode: "1777"
 
-# 2) PostgreSQL on db host (cloud-safe: detect version from /etc/postgresql)
+
 - name: Install + configure PostgreSQL on db (cloud-safe)
   hosts: db
   become: true
   vars:
+    # Στοιχεία βάσης (user/db)
     db_user: "demo_user"
     db_pass: "demo_pass"
     db_name: "demo_db"
@@ -29,11 +30,13 @@
         state: present
         update_cache: yes
 
+    # Βρίσκουμε τη major version από το /etc/postgresql για να χτίσουμε σωστό path στο postgresql.conf
     - name: Detect PostgreSQL major version from /etc/postgresql
       shell: ls -1 /etc/postgresql | sort -n | tail -n 1
       register: pg_major
       changed_when: false
 
+    # Ρυθμίζουμε την Postgres να ακούει μόνο τοπικά (127.0.0.1) για ασφάλεια (DB είναι στο ίδιο VM)
     - name: Configure listen_addresses
       lineinfile:
         path: "/etc/postgresql/{{ pg_major.stdout }}/main/postgresql.conf"
@@ -41,32 +44,38 @@
         line: "listen_addresses = '127.0.0.1'"
       notify: restart postgres
 
+
     - name: Ensure PostgreSQL is running
       service:
         name: postgresql
         state: started
         enabled: yes
 
+    # Τρέχουμε άμεσα τον handler (restart) αν έγιναν αλλαγές στο config
     - name: Apply pending handler actions now
       meta: flush_handlers
 
+    # Δημιουργούμε user αν δεν υπάρχει
     - name: Create PostgreSQL user (safe)
       shell: |
         set -e
         sudo -u postgres psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='{{ db_user }}'" | grep -q 1 \
           || sudo -u postgres psql -c "CREATE USER {{ db_user }} WITH PASSWORD '{{ db_pass }}';"
 
+    # Δημιουργούμε database αν δεν υπάρχει και την ορίζουμε να ανήκει στον user
     - name: Create PostgreSQL database (safe)
       shell: |
         set -e
         sudo -u postgres psql -tAc "SELECT 1 FROM pg_database WHERE datname='{{ db_name }}'" | grep -q 1 \
           || sudo -u postgres psql -c "CREATE DATABASE {{ db_name }} OWNER {{ db_user }};"
 
+    # Δίνουμε δικαιώματα στον user για τη βάση
     - name: Ensure privileges (safe)
       shell: |
         set -e
         sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE {{ db_name }} TO {{ db_user }};"
 
+    # Περιμένουμε να επιβεβαιώσουμε ότι η Postgres ακούει στη 5432 τοπικά
     - name: Wait for PostgreSQL to listen on 5432
       wait_for:
         host: "127.0.0.1"
@@ -79,7 +88,7 @@
         name: postgresql
         state: restarted
 
-# 3) Supporting services on backend (imports that already work)
+
 - import_playbook: ../../../vms/playbooks/minio.yml
   vars:
     target_hosts: backend
@@ -88,7 +97,6 @@
   vars:
     target_hosts: backend
 
-# 4) Backend prerequisites (imports that already work)
 - import_playbook: ../../../vms/playbooks/java21.yml
   vars:
     target_hosts: backend
@@ -97,8 +105,8 @@
   vars:
     target_hosts: backend
 
-# 5) Cloud-safe clone (INLINE: no vagrant, correct branch, correct ownership)
-- name: Clone or update DS-2025 repository (cloud-safe, no vagrant)
+
+- name: Clone or update DS-2025 repository
   hosts: backend
   become: true
   vars:
@@ -115,6 +123,7 @@
         update_cache: yes
         cache_valid_time: 3600
 
+
     - name: Check if repo already exists
       stat:
         path: "{{ project_dir }}/.git"
@@ -129,6 +138,7 @@
         force: yes
       when: not repo_git.stat.exists
 
+    # Αν υπάρχει repo, κάνουμε “καθαρό” sync με origin branch
     - name: Force update repo if exists
       shell: |
         set -e
@@ -140,6 +150,7 @@
         executable: /bin/bash
       when: repo_git.stat.exists
 
+    # Βάζουμε σωστό owner/group στον φάκελο του project (για build/run χωρίς permission issues)
     - name: Ensure correct ownership
       file:
         path: "{{ project_dir }}"
@@ -164,18 +175,18 @@
     - debug:
         msg: "DS-2025 VERSION={{ ver_out.stdout }}"
 
-# 6) Backend env (reuse existing backend_env.yml but override vars for single host)
+# Ρύθμιση env μεταβλητών backend (DB/Mailhog/MinIO + base URL/CORS)
 - import_playbook: ../../../vms/playbooks/backend_env.yml
   vars:
     target_hosts: backend
     db_host: 127.0.0.1
     mail_host: 127.0.0.1
     minio_endpoint: "http://127.0.0.1:9000"
-    app_public_base_url: "http://front"   # will be fixed later by HTTPS/CORS patch section
+    app_public_base_url: "http://front"   # θα γίνει patch αργότερα με βάση το public IP του front
     cors_allowed_origins: "http://front,http://localhost,http://127.0.0.1"
 
-# 7) Build backend JAR (INLINE: no vagrant)
-- name: Build Spring Boot backend JAR (cloud-safe, no vagrant)
+
+- name: Build Spring Boot backend JAR
   hosts: backend
   become: true
   vars:
@@ -183,12 +194,14 @@
     jar_dest: /opt/DS-2025/backend/app.jar
     build_user: "{{ ansible_user }}"
   tasks:
+
     - name: Build backend (skip tests)
       command: mvn -DskipTests package
       args:
         chdir: "{{ project_dir }}"
       become_user: "{{ build_user }}"
 
+    # Βρίσκουμε το “σωστό” jar από το target
     - name: Find built jar (exclude sources/javadoc/original)
       shell: |
         ls -1 {{ project_dir }}/target/*.jar \
@@ -204,6 +217,7 @@
         msg: "Build finished but no suitable JAR found in {{ project_dir }}/target"
       when: built_jar.stdout | length == 0
 
+    # Αντιγράφουμε το jar σε “σταθερό” path (app.jar) για να το χρησιμοποιεί το systemd service
     - name: Copy jar to stable path (app.jar)
       copy:
         src: "{{ built_jar.stdout }}"
@@ -213,8 +227,8 @@
         group: root
         mode: "0755"
 
-# 8) Backend systemd service (INLINE: no vagrant)
-- name: Create and run backend systemd service (cloud-safe, no vagrant)
+
+- name: Create and run backend systemd service
   hosts: backend
   become: true
   vars:
@@ -224,6 +238,7 @@
     env_file: /opt/DS-2025/backend/app.env
     run_user: "{{ ansible_user }}"
   tasks:
+    # Δημιουργούμε systemd unit ώστε το backend να τρέχει σαν service (restart/enable στο boot)
     - name: Create systemd unit file
       copy:
         dest: "/etc/systemd/system/{{ app_name }}.service"
@@ -231,22 +246,27 @@
         content: |
           [Unit]
           Description=DS-2025 Spring Boot Backend
+          # Περιμένουμε να είναι "online" το network πριν ξεκινήσει η υπηρεσία
           Wants=network-online.target
           After=network-online.target
-
           [Service]
+          # Απλό service: το process τρέχει στο foreground (τυπικό για Spring Boot)
           Type=simple
+          # Τρέχει ως μη-root χρήστης
           User={{ run_user }}
           WorkingDirectory={{ workdir }}
           EnvironmentFile={{ env_file }}
           ExecStart=/usr/bin/java -jar {{ jar_path }}
           Restart=always
           RestartSec=3
+          # Θεωρούμε "επιτυχή" τον τερματισμό με SIGTERM (143) σε graceful stop
           SuccessExitStatus=143
 
           [Install]
+          # Επιτρέπει enable για αυτόματη εκκίνηση στο boot
           WantedBy=multi-user.target
 
+    # Reload του systemd για να “δει” το νέο/ενημερωμένο unit file
     - name: Reload systemd daemon
       systemd:
         daemon_reload: yes
@@ -264,12 +284,11 @@
         state: started
         timeout: 120
 
-# 9) Frontend prerequisites (we will NOT import nvm_install/nvm_verify that are vagrant-only)
-# We’ll just ensure node/npm exist and then reuse your existing frontend playbooks that already auto-detect user.
-- name: Ensure Node.js/npm available on front (cloud-safe)
+- name: Ensure Node.js/npm available on front
   hosts: front
   become: true
   tasks:
+    # Εγκατάσταση Node.js/npm στο front VM για build/serve του Vue frontend
     - name: Install nodejs + npm (system)
       apt:
         name: [nodejs, npm]
@@ -277,11 +296,12 @@
         update_cache: yes
         cache_valid_time: 3600
 
-# 10) Frontend env/build (reuse existing ones that auto-detect user)
+
 - import_playbook: ../../../vms/playbooks/frontend_env.yml
   vars:
     target_hosts: front
 
+# Αφαιρούμε/διορθώνουμε τιμές που έχουν μείνει σε localhost ώστε το frontend να λειτουργεί σωστά στο VM
 - import_playbook: ../../../vms/playbooks/frontend_strip_localhost.yml
   vars:
     target_hosts: front
@@ -290,8 +310,7 @@
   vars:
     target_hosts: front
 
-# 11) Frontend systemd service (INLINE: no vagrant)
-- name: Create and run frontend systemd service (cloud-safe, no vagrant)
+- name: Create and run frontend systemd service
   hosts: front
   become: true
   vars:
@@ -300,6 +319,7 @@
     frontend_dir: "/opt/DS-2025/frontend/vue-argon-design-system-master"
     front_port: 8081
   tasks:
+    # Δημιουργούμε systemd unit για το frontend ώστε να σερβίρει το built dist σαν υπηρεσία:
     - name: Create systemd unit for frontend (serve dist via npx serve)
       copy:
         dest: "/etc/systemd/system/{{ app_name }}.service"
@@ -307,20 +327,28 @@
         content: |
           [Unit]
           Description=DS-2025 Frontend (serve dist)
+          # Περιμένουμε να είναι "online" το network πριν ξεκινήσει η υπηρεσία
           Wants=network-online.target
           After=network-online.target
 
           [Service]
           Type=simple
+          # Τρέχει ως μη-root χρήστης
           User={{ run_user }}
           WorkingDirectory={{ frontend_dir }}
+          # Εκκίνηση static server για το dist:
+          # -s dist: SPA mode (σωστό routing)
+          # -l: port που θα ακούει το frontend
           ExecStart=/usr/bin/env bash -lc 'cd "{{ frontend_dir }}" && npx --yes serve -s dist -l {{ front_port }}'
           Restart=always
           RestartSec=3
 
           [Install]
+          # Επιτρέπει enable για αυτόματη εκκίνηση στο boot
           WantedBy=multi-user.target
 
+
+    # Reload systemd ώστε να διαβαστεί το νέο unit file
     - name: Reload systemd
       systemd:
         daemon_reload: true
@@ -337,7 +365,7 @@
         port: "{{ front_port }}"
         timeout: 90
 
-# 12) Nginx on front (reuse existing nginx playbooks)
+
 - import_playbook: ../../../vms/playbooks/nginx_install.yml
   vars:
     target_hosts: front
@@ -357,7 +385,7 @@
   vars:
     target_hosts: front
 
-# 13) Online URL patch + CORS + restart backend (inventory-driven)
+
 - name: Patch backend public URL + CORS for online (inventory-based)
   hosts: backend
   become: true
@@ -367,7 +395,9 @@
     - name: Patch backend env file (APP_PUBLIC_BASE_URL)
       lineinfile:
         path: /opt/DS-2025/backend/app.env
+        # Αντικαθιστούμε τη γραμμή που ξεκινά με APP_PUBLIC_BASE_URL=
         regexp: '^APP_PUBLIC_BASE_URL='
+        # Θέτουμε τη σωστή τιμή με βάση το public IP/host του front
         line: "APP_PUBLIC_BASE_URL={{ public_base_url }}"
 
     - name: Patch backend env file (APP_FRONTEND_URL)
@@ -385,23 +415,22 @@
           http://localhost,
           http://127.0.0.1
 
+    # Restart του backend για να εφαρμοστούν οι αλλαγές στο env file
     - name: Restart backend
       service:
         name: ds2025-backend
         state: restarted
 
-
-
-# 14) Healthchecks (reuse existing)
-- name: Healthcheck (single VM)
+- name: Healthcheck
   hosts: backend
   become: true
   tasks:
+    # Έλεγχος ότι η βάση ακούει τοπικά στη 5432
     - name: Check DB local
       shell: nc -vz -w 2 127.0.0.1 5432
       changed_when: false
 
+    # Έλεγχος ότι το backend απαντάει HTTP (200/302 κ.λπ.) στο localhost:8080
     - name: Check backend local
       shell: curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:8080/ || true
       changed_when: false
-
