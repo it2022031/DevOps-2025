@@ -34,6 +34,8 @@
         group: root
         mode: "0755"
 
+    # Γράφουμε το αρχείο app.env με όλες τις μεταβλητές περιβάλλοντος του backend
+    # Το copy module είναι idempotent (γράφει μόνο αν αλλάξει κάτι)
     - name: Write backend env file (idempotent)
       copy:
         dest: "{{ env_file }}"
@@ -64,17 +66,15 @@
       debug:
         msg: "Backend env file written at {{ env_file }}"
 
-    # ✅ Restart only if:
-    #  - env file changed AND
-    #  - service exists already (fresh install won't have it yet)
+    # Παίρνουμε πληροφορίες για τα services του συστήματος
+    # Εκτελείται μόνο αν άλλαξε το env αρχείο
     - name: Gather service facts
       service_facts:
       when: env_written.changed
 
+    # Κάνουμε restart το backend service ΜΟΝΟ αν:
+    # - άλλαξε το env αρχείο
+    # - υπάρχει ήδη το systemd service backend
     - name: Restart backend service if present and env changed
       service:
         name: ds2025-backend
-        state: restarted
-      when:
-        - env_written.changed
-        - "'ds2025-backend.service' in ansible_facts.services"

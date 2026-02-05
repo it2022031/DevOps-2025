@@ -18,13 +18,16 @@
         content: |
           [Unit]
           Description=DS-2025 Spring Boot Backend
+          # Ξεκίνα αφού είναι έτοιμο το network
           Wants=network-online.target
           After=network-online.target
 
           [Service]
           Type=simple
+          # Τρέχει ως μη-root χρήστης
           User={{ run_user }}
           WorkingDirectory={{ workdir }}
+          # Φορτώνει env μεταβλητές από αρχείο
           EnvironmentFile={{ env_file }}
           ExecStart=/usr/bin/java -jar {{ jar_path }}
           Restart=always
@@ -32,6 +35,7 @@
           SuccessExitStatus=143
 
           [Install]
+          # Επιτρέπει enable ώστε να ξεκινά στο boot
           WantedBy=multi-user.target
       notify: restart backend
 
@@ -45,7 +49,6 @@
         enabled: yes
         state: started
 
-    # Προαιρετικό αλλά πολύ χρήσιμο: έλεγχος ότι τρέχει
     - name: Check backend service is active
       command: systemctl is-active {{ app_name }}
       register: svc_active
@@ -54,6 +57,7 @@
     - name: Show backend service status
       debug:
         var: svc_active.stdout
+
     - name: Wait for backend port to be open
       wait_for:
         host: 127.0.0.1

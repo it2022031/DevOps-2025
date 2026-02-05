@@ -23,7 +23,6 @@
         path: "{{ project_dir }}/.git"
       register: repo_git
 
-    # ✅ If repo exists: hard-reset to remote branch and clean everything
     - name: Discard local changes if repo exists (fetch + reset origin + clean)
       shell: |
         set -e
@@ -35,7 +34,6 @@
         executable: /bin/bash
       when: repo_git.stat.exists
 
-    # ✅ If repo does not exist: clone it
     - name: Clone repository if missing
       git:
         repo: "{{ repo_url }}"
@@ -45,7 +43,6 @@
         force: yes
       when: not repo_git.stat.exists
 
-    # ✅ If repo exists: ensure it's on the correct branch and forced to remote state
     - name: Ensure repo is updated to the latest remote state (force)
       git:
         repo: "{{ repo_url }}"
@@ -62,7 +59,6 @@
         group: "{{ app_owner }}"
         recurse: yes
 
-    # ✅ Write running git commit into /opt/DS-2025/VERSION
     - name: Write VERSION file with current commit
       shell: |
         set -e
