@@ -12,9 +12,6 @@
     docker_compose_bin: /usr/local/bin/docker-compose
     docker_compose_url: "https://github.com/docker/compose/releases/download/v2.24.6/docker-compose-linux-x86_64"
 
-    # If GHCR images are private, set these (recommended via extra-vars in Jenkins):
-    # ghcr_username: "it2022031"
-    # ghcr_token: "<TOKEN_WITH_read:packages>"
     ghcr_registry: "ghcr.io"
 
   tasks:
@@ -63,14 +60,12 @@
         msg: "Missing docker-compose.yml at {{ compose_dir }}/docker-compose.yml"
       when: not compose_stat.stat.exists
 
-    # Detect if "docker compose" (v2 plugin) exists
     - name: Check docker compose v2 availability
       command: docker compose version
       register: compose_v2_check
       changed_when: false
       failed_when: false
 
-    # If v2 plugin missing, install standalone docker-compose binary
     - name: Check if standalone docker-compose exists
       stat:
         path: "{{ docker_compose_bin }}"
@@ -83,8 +78,7 @@
         mode: "0755"
       when: compose_v2_check.rc != 0 and not compose_bin.stat.exists
 
-    # Optional: GHCR login (ONLY if credentials provided; for public images it is skipped)
-    - name: GHCR login (if ghcr_username & ghcr_token provided)
+    - name: GHCR login
       shell: |
         set -e
         echo "{{ ghcr_token }}" | docker login {{ ghcr_registry }} -u "{{ ghcr_username }}" --password-stdin
@@ -96,7 +90,6 @@
         - ghcr_username | length > 0
         - ghcr_token | length > 0
 
-    # Pull + Up (NO BUILD)
     - name: Compose pull (v2)
       command: docker compose pull
       args:

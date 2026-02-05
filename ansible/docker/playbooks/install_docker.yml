@@ -39,7 +39,7 @@
     - debug:
         msg: "{{ compose_version_out.stdout }}"
 
-    - name: Add vagrant user to docker group (optional but useful)
+    - name: Add vagrant user to docker group
       user:
         name: vagrant
         groups: docker

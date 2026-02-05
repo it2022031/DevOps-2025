@@ -1,7 +1,7 @@
 FROM node:18 AS build
 WORKDIR /src
 
-# ensure git exists (needed for git clone)
+# Εγκαθιστούμε git
 RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
 
 ARG REPO_URL
@@ -14,7 +14,8 @@ ENV VUE_APP_API_BASE_URL=/api
 
 RUN npm ci || npm install
 
-# PATCH: remove hardcoded localhost:8080 (use /api via nginx proxy)
+# αφαιρούμε hardcoded calls στο http://localhost:8080
+# και τα αντικαθιστούμε ώστε να περνάνε από το nginx (/api)
 RUN set -eu; \
     echo "== Before patch (localhost:8080 occurrences) =="; \
     grep -R --line-number "localhost:8080" src || true; \
@@ -30,7 +31,11 @@ RUN set -eu; \
 
 RUN npm run build
 
+
+# σερβίρισμα του built frontend με nginx
 FROM nginx:alpine
 COPY --from=build /src/app/frontend/vue-argon-design-system-master/dist /usr/share/nginx/html
+
+# Custom nginx config
 COPY dockerfiles/nginx-frontend.conf /etc/nginx/conf.d/default.conf
 EXPOSE 80

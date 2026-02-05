@@ -6,16 +6,19 @@ services:
       POSTGRES_USER: demo_user
       POSTGRES_PASSWORD: demo_pass
     volumes:
+      # Persistent volume για τα δεδομένα της PostgreSQL
       - pgdata:/var/lib/postgresql/data
 
-      # SQL + photos from synced /vagrant
+      # SQL seed + φωτογραφίες από shared /vagrant
       - /vagrant/data/sqlData:/seed:ro
       - /vagrant/data/sqlData/photos/avatar_photos:/photos/avatar_photos:ro
       - "/vagrant/data/sqlData/photos/property_photos :/photos/property_photos:ro"
 
-      # (προαιρετικά) τα παλιά mounts – μπορείς να τα κρατήσεις ή να τα βγάλεις
+      # παλιά mounts
       - /opt/DS-2025:/ds2025:ro
       - /opt/DS-2025/photos:/photos_src:ro
+
+    # Expose PostgreSQL προς το host
     ports:
       - "5432:5432"
     healthcheck:
@@ -27,22 +30,29 @@ services:
   mailhog:
     image: mailhog/mailhog
     ports:
+      # SMTP
       - "1025:1025"
+      # Web
       - "8025:8025"
 
   minio:
     image: minio/minio
+    # Εκκίνηση server + console
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: minioadmin123
     volumes:
+      # Persistent storage για MinIO
       - minio_data:/data
     ports:
+      # API
       - "9000:9000"
+      # Console
       - "9001:9001"
 
   backend:
+    # Online image από GitHub Container Registry
     image: ghcr.io/it2022031/ds2025-backend:latest
     environment:
       SPRING_PROFILES_ACTIVE: docker
@@ -58,6 +68,8 @@ services:
       MINIO_ENDPOINT: http://minio:9000
       APP_PUBLIC_BASE_URL: "http://127.0.0.1:8081"
       APP_FRONTEND_URL: "http://127.0.0.1:8081"
+
+    # Περιμένει να είναι healthy η βάση
     depends_on:
       db:
         condition: service_healthy
@@ -65,9 +77,11 @@ services:
       - "8080:8080"
 
   frontend:
+    # Online image από GHCR
     image: ghcr.io/it2022031/ds2025-frontend:latest
     depends_on:
       - backend
+    # Frontend στο host
     ports:
       - "8081:80"
 

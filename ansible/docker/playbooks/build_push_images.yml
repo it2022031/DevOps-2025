@@ -10,6 +10,7 @@
 
     ghcr_user: "it2022031"
 
+    # Ονόματα images
     backend_image: "ghcr.io/it2022031/ds2025-backend:latest"
     frontend_image: "ghcr.io/it2022031/ds2025-frontend:latest"
 
@@ -38,10 +39,12 @@
         version: main
         force: yes
 
+    # Κάνουμε login στο GitHub Container Registry
     - name: Docker login to GHCR
       shell: echo "{{ ghcr_token }}" | docker login ghcr.io -u "{{ ghcr_user }}" --password-stdin
-      no_log: true
+      no_log: true  # Δεν εμφανίζεται το token στα logs
 
+    # Δημιουργούμε το backend image χρησιμοποιώντας το Dockerfile
     - name: Build backend image
       command: >
         docker build

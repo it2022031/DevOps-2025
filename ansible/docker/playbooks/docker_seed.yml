@@ -1,64 +1,64 @@
----
-# 0) Ensure DS-2025 repo exists on dockerhost (reproducible)
-- import_playbook: ../../vms/playbooks/clone_ds2025.yml
-  vars:
-    target_hosts: docker_nodes
-    repo_url: "https://github.com/it2022031/DS-2025.git"
-    project_dir: "/opt/DS-2025"
-    repo_version: "main-branch"
-    app_owner: "vagrant"
-    version_file: "/opt/DS-2025/VERSION"
-
-# 1) Seed DB using SQL that exists INSIDE the mounted DS-2025 repo
-- name: Seed DB in Docker from DS-2025 repo (no host copy)
-  hosts: docker_nodes
-  become: true
-
-  vars:
-    compose_dir: "/vagrant/ansible/docker"
-    db_name: "demo_db"
-    db_user: "demo_user"
-
-    # SQL path INSIDE db container (because /opt/DS-2025 is mounted as /ds2025)
-    seed_sql_in_container: "/ds2025/backend/demo/src/main/resources/db/migration/test_dedomena.sql"
-
-  tasks:
-    - name: Bring stack up (apply mounts)
-      command: /usr/local/bin/docker-compose up -d
-      args:
-        chdir: "{{ compose_dir }}"
-
-    - name: Verify SQL exists inside db container
-      shell: |
-        set -e
-        cd "{{ compose_dir }}"
-        /usr/local/bin/docker-compose exec -T db sh -lc 'test -f "{{ seed_sql_in_container }}" && echo OK'
-      args:
-        executable: /bin/bash
-
-    - name: Run seed SQL inside db container
-      shell: |
-        set -e
-        cd "{{ compose_dir }}"
-        /usr/local/bin/docker-compose exec -T db sh -lc \
-          'psql -U "{{ db_user }}" -d "{{ db_name }}" -v ON_ERROR_STOP=1 -f "{{ seed_sql_in_container }}"'
-      args:
-        executable: /bin/bash
-
-    - name: Sanity check counts
-      shell: |
-        set -e
-        cd "{{ compose_dir }}"
-        /usr/local/bin/docker-compose exec -T db sh -lc "
-          psql -U {{ db_user }} -d {{ db_name }} -c \"select 'users' as t, count(*) from users
-          union all
-          select 'properties' as t, count(*) from properties;\"
-        "
-      args:
-        executable: /bin/bash
-      register: sanity
-      changed_when: false
-
-    - debug:
-        var: sanity.stdout_lines
-
+#---
+#
+#- import_playbook: ../../vms/playbooks/clone_ds2025.yml
+#  vars:
+#    target_hosts: docker_nodes
+#    repo_url: "https://github.com/it2022031/DS-2025.git"
+#    project_dir: "/opt/DS-2025"
+#    repo_version: "main-branch"
+#    app_owner: "vagrant"
+#    version_file: "/opt/DS-2025/VERSION"
+#
+#
+#- name: Seed DB in Docker from DS-2025 repo (no host copy)
+#  hosts: docker_nodes
+#  become: true
+#
+#  vars:
+#    compose_dir: "/vagrant/ansible/docker"
+#    db_name: "demo_db"
+#    db_user: "demo_user"
+#
+#
+#    seed_sql_in_container: "/ds2025/backend/demo/src/main/resources/db/migration/test_dedomena.sql"
+#
+#  tasks:
+#    - name: Bring stack up (apply mounts)
+#      command: /usr/local/bin/docker-compose up -d
+#      args:
+#        chdir: "{{ compose_dir }}"
+#
+#    - name: Verify SQL exists inside db container
+#      shell: |
+#        set -e
+#        cd "{{ compose_dir }}"
+#        /usr/local/bin/docker-compose exec -T db sh -lc 'test -f "{{ seed_sql_in_container }}" && echo OK'
+#      args:
+#        executable: /bin/bash
+#
+#    - name: Run seed SQL inside db container
+#      shell: |
+#        set -e
+#        cd "{{ compose_dir }}"
+#        /usr/local/bin/docker-compose exec -T db sh -lc \
+#          'psql -U "{{ db_user }}" -d "{{ db_name }}" -v ON_ERROR_STOP=1 -f "{{ seed_sql_in_container }}"'
+#      args:
+#        executable: /bin/bash
+#
+#    - name: Sanity check counts
+#      shell: |
+#        set -e
+#        cd "{{ compose_dir }}"
+#        /usr/local/bin/docker-compose exec -T db sh -lc "
+#          psql -U {{ db_user }} -d {{ db_name }} -c \"select 'users' as t, count(*) from users
+#          union all
+#          select 'properties' as t, count(*) from properties;\"
+#        "
+#      args:
+#        executable: /bin/bash
+#      register: sanity
+#      changed_when: false
+#
+#    - debug:
+#        var: sanity.stdout_lines
+#

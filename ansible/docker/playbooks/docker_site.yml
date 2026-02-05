@@ -1,8 +1,6 @@
 ---
-# 1) Install docker on the dockerhost VM
 - import_playbook: install_docker.yml
 
-# 2) Bring up docker-compose stack
 - name: Bring up DS-2025 docker-compose
   hosts: docker_nodes
   become: true
