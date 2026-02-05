@@ -30,6 +30,7 @@
         dest: "{{ mailhog_bin }}"
         mode: "0755"
 
+    # Φτιάχνουμε systemd service για να τρέχει μόνιμα και να ξεκινά στο boot
     - name: Create systemd unit for MailHog
       copy:
         dest: /etc/systemd/system/mailhog.service
@@ -37,12 +38,15 @@
         content: |
           [Unit]
           Description=MailHog
+          # Ξεκίνα αφού είναι έτοιμο το δίκτυο
           After=network-online.target
           Wants=network-online.target
 
           [Service]
+          # Τρέχει ως mailhog χρήστης 
           User={{ mailhog_user }}
           Group={{ mailhog_group }}
+          # SMTP στο 1025 και UI στο 8025 (0.0.0.0 = ακούει σε όλα τα interfaces)
           ExecStart={{ mailhog_bin }} -smtp-bind-addr 0.0.0.0:{{ smtp_port }} -ui-bind-addr 0.0.0.0:{{ ui_port }}
           Restart=always
 

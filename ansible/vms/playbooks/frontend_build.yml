@@ -18,8 +18,7 @@
         msg: "Frontend dir missing: {{ frontend_dir }}"
       when: not fe_dir.stat.exists
 
-    # Βρίσκουμε αυτόματα ποιος χρήστης θα κάνει το build
-    # (αν υπάρχει vagrant τον προτιμάμε, αλλιώς ubuntu, αλλιώς ansible_user)
+    # αν υπάρχει vagrant τον προτιμάμε, αλλιώς ubuntu, αλλιώς ansible_user
     - name: Detect build_user
       set_fact:
         build_user: >-
@@ -28,7 +27,6 @@
             else ('ubuntu' if (ansible_facts.getent_passwd['ubuntu'] is defined) else ansible_user)
           }}
 
-    # Βάζουμε ownership στον build_user για να μην έχουμε permission errors (EACCES)
     - name: Ensure frontend dir owned by build_user (avoid EACCES)
       file:
         path: "{{ frontend_dir }}"
@@ -36,7 +34,6 @@
         group: "{{ build_user }}"
         recurse: true
 
-    # Εγκαθιστούμε nodejs + npm από apt σαν fallback (ώστε να υπάρχει npm)
     - name: Ensure nodejs and npm exist (fallback)
       apt:
         name:
@@ -46,8 +43,6 @@
         update_cache: yes
         cache_valid_time: 3600
 
-    # Κάνουμε npm install / npm ci και μετά npm run build
-    # Αν υπάρχει NVM, το χρησιμοποιούμε (αλλιώς πάμε με το system node)
     - name: Install deps + build (use NVM if available, else system node)
       become_user: "{{ build_user }}"
       shell: |
@@ -73,13 +68,11 @@
       args:
         executable: /bin/bash
 
-    # Ελέγχουμε ότι όντως δημιουργήθηκε το dist/
     - name: Verify dist exists
       stat:
         path: "{{ frontend_dir }}/dist"
       register: dist_dir
 
-    # Αν δεν δημιουργήθηκε, σταματάμε με σφάλμα
     - name: Fail if dist missing
       fail:
         msg: "dist/ not created"

@@ -9,6 +9,7 @@
     db_name: demo_db
     db_user: demo_user
     db_pass: demo_pass
+
     seed_sql: /vagrant/data/sqlData/test_dedomena.sql
 
   tasks:
@@ -37,7 +38,9 @@
     - name: Run seed SQL
       shell: |
         set -euo pipefail
+        # Περνάμε τον κωδικό μέσω env για να μη ζητάει prompt
         export PGPASSWORD='{{ db_pass }}'
+        # Εκτέλεση του SQL αρχείου στη βάση
         psql -v ON_ERROR_STOP=1 -h '{{ db_host }}' -p '{{ db_port }}' -U '{{ db_user }}' -d '{{ db_name }}' -f '{{ seed_sql }}'
       args:
         executable: /bin/bash

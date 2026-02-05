@@ -5,9 +5,9 @@
 
   vars:
     pg_version: "14"
+
     allowed_cidr_default: "192.168.56.0/24"
 
-    # DB credentials (override via inventory/group_vars if needed)
     db_user: "demo_user"
     db_pass: "demo_pass"
     db_name: "demo_db"
@@ -34,6 +34,7 @@
         state: started
         enabled: yes
 
+    # Ρυθμίζουμε τη βάση να ακούει σε όλα τα interfaces
     - name: Configure listen_addresses
       lineinfile:
         path: "/etc/postgresql/{{ pg_version }}/main/postgresql.conf"
@@ -41,6 +42,7 @@
         line: "listen_addresses = '*'"
       notify: restart postgres
 
+    # Επιτρέπουμε συνδέσεις από το subnet των εφαρμογών (md5 password auth)
     - name: Allow network connections in pg_hba.conf (app subnet)
       lineinfile:
         path: "/etc/postgresql/{{ pg_version }}/main/pg_hba.conf"
@@ -49,10 +51,10 @@
         insertafter: EOF
       notify: restart postgres
 
+    # Εφαρμόζουμε άμεσα τα restart handlers ώστε οι αλλαγές να ισχύουν πριν συνεχίσουμε
     - name: Apply pending handler actions now
       meta: flush_handlers
 
-    # ---- Safe user/db creation (avoids become_user tmp chown issues) ----
     - name: Create PostgreSQL user (psql safe)
       shell: |
         set -e
@@ -65,6 +67,7 @@
         sudo -u postgres psql -tAc "SELECT 1 FROM pg_database WHERE datname='{{ db_name }}'" | grep -q 1 \
           || sudo -u postgres psql -c "CREATE DATABASE {{ db_name }} OWNER {{ db_user }};"
 
+    # Δίνουμε δικαιώματα στον χρήστη για τη συγκεκριμένη βάση
     - name: Ensure privileges (psql safe)
       shell: |
         set -e

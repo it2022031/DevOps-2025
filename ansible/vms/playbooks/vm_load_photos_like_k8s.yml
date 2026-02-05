@@ -30,6 +30,8 @@
         msg: "Missing {{ photos_dir }} (expected /vagrant/data/sqlData/photos/)"
       when: not s2.stat.exists
 
+    # Φτιάχνουμε σταθερό path (/photos) όπως το περιμένει το SQL script
+    # Χρησιμοποιούμε symlinks για να μη χρειάζεται αντιγραφή αρχείων
     - name: Prepare /photos as stable path expected by SQL
       shell: |
         set -e
@@ -37,10 +39,10 @@
         rm -rf /photos
         mkdir -p /photos
 
-        # avatar_photos must exist
+        # Πρέπει να υπάρχει ο φάκελος avatar_photos
         test -d "{{ photos_dir }}/avatar_photos"
 
-        # property_photos might exist with or without trailing space
+        # Ο φάκελος property_photos μπορεί να υπάρχει και με trailing space (λάθος όνομα)
         if [ -d "{{ photos_dir }}/property_photos" ]; then
           PROP_DIR="{{ photos_dir }}/property_photos"
         elif [ -d "{{ photos_dir }}/property_photos " ]; then
@@ -50,12 +52,14 @@
           exit 1
         fi
 
+        # Δημιουργούμε symlinks ώστε το SQL να βρίσκει πάντα /photos/...
         ln -s "{{ photos_dir }}/avatar_photos" /photos/avatar_photos
         ln -s "$PROP_DIR" /photos/property_photos
 
         echo "Symlinks:"
         ls -la /photos
 
+        # Μικρός έλεγχος ότι υπάρχουν δείγματα αρχείων
         echo "Check sample files:"
         test -f "/photos/avatar_photos/f1.jpg"
         test -f "/photos/property_photos/Lake Villa 1.jpg"

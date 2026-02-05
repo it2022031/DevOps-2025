@@ -7,7 +7,6 @@
   vars:
     frontend_dir: "/opt/DS-2025/frontend/vue-argon-design-system-master"
 
-    # Για nginx reverse proxy στο front: /api
     backend_base_url: "/api"
 
   tasks:

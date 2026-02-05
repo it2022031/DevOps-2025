@@ -4,9 +4,9 @@
   become: true
 
   vars:
-    node_version: "18"   # installs latest 18.x
+    node_version: "18"
     nvm_dir: "/home/vagrant/.nvm"
-    nvm_version: "v0.39.7"   # stable nvm release (ok)
+    nvm_version: "v0.39.7"
 
   tasks:
     - name: Ensure dependencies for nvm exist

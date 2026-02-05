@@ -7,8 +7,6 @@
     app_name: ds2025-frontend
     run_user: vagrant
     frontend_dir: "/opt/DS-2025/frontend/vue-argon-design-system-master"
-
-    # Συνήθως Vue CLI serve βγαίνει στο 8080, αλλά το αλλάζουμε για να μην μπερδευτείς
     front_port: 8081
 
   tasks:

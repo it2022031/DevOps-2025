@@ -11,7 +11,6 @@
     minio_console_port: 9001
     minio_api_port: 9000
 
-    # Για εργασία OK. Σε production -> Ansible Vault
     minio_root_user: minioadmin
     minio_root_password: minioadmin123
 
@@ -55,6 +54,7 @@
           MINIO_VOLUMES={{ minio_data_dir }}
           MINIO_OPTS=--console-address :{{ minio_console_port }}
 
+    # Φτιάχνουμε systemd service για να τρέχει μόνιμα και να ξεκινά στο boot
     - name: Create systemd unit for MinIO
       copy:
         dest: /etc/systemd/system/minio.service
@@ -62,15 +62,21 @@
         content: |
           [Unit]
           Description=MinIO
+          # Ξεκίνα αφού είναι έτοιμο το δίκτυο
           After=network-online.target
           Wants=network-online.target
 
           [Service]
+          # Τρέχει ως minio χρήστης (όχι root)
           User={{ minio_user }}
           Group={{ minio_group }}
+          # Φορτώνει τις μεταβλητές από /etc/default/minio
           EnvironmentFile=/etc/default/minio
+          # Εκκίνηση MinIO server με volume + console options
           ExecStart={{ minio_bin }} server $MINIO_VOLUMES $MINIO_OPTS
+          # Αν πέσει, ξανασηκώνεται
           Restart=always
+          # Αυξάνουμε το όριο open files (χρήσιμο για object storage)
           LimitNOFILE=65536
 
           [Install]

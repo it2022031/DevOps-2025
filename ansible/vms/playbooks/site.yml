@@ -1,28 +1,30 @@
 ---
-# 0) Host preflight (optional αλλά καλό)
+# 0) Έλεγχοι στο host πριν ξεκινήσουμε
 - import_playbook: preflight_host.yml
 
+# Mapping hostnames (backend/db/front) ώστε να “λύνουν” σωστά μέσα στα VMs
 - import_playbook: ../../common/playbooks/hosts_map.yml
 
-# 1) Common prep on all VMs
+# 1) Κοινή προετοιμασία σε όλα τα VMs
 - name: Common prep on all VMs
   hosts: vms
   become: true
   tasks:
+    # Φτιάχνουμε tmp directory για να μην έχει θέματα το Ansible/Jenkins με temporary files
     - name: Ensure ansible remote tmp exists
       file:
         path: /tmp/.ansible-jenkins/tmp
         state: directory
         mode: "1777"
 
-# 2) Database
+# 2) Εγκατάσταση/ρύθμιση PostgreSQL στη DB VM
 - import_playbook: postgres.yml
 
-# 3) Supporting services on backend
+# 3) Supporting services στο backend VM (MinIO + MailHog)
 - import_playbook: minio.yml
 - import_playbook: mailhog.yml
 
-# 4) Backend prerequisites + code
+# 4) Προαπαιτούμενα backend + κατέβασμα κώδικα
 - import_playbook: java21.yml
 - import_playbook: maven.yml
 
@@ -30,12 +32,12 @@
   vars:
     target_hosts: backend
 
-# 5) Backend runtime
+# 5) Backend runtime: env, build jar, και systemd service
 - import_playbook: backend_env.yml
 - import_playbook: build_backend.yml
 - import_playbook: backend_service.yml
 
-# 6) Backend Nginx (proxy :80 -> :8080)
+# 6) Nginx στο backend (reverse proxy :80 -> :8080)
 - import_playbook: nginx_install.yml
   vars:
     target_hosts: backend
@@ -52,7 +54,7 @@
   vars:
     target_hosts: backend
 
-# 7) Frontend prerequisites + code
+# 7) Προαπαιτούμενα frontend
 - import_playbook: nvm_install.yml
 - import_playbook: nvm_verify.yml
 
@@ -60,13 +62,13 @@
   vars:
     target_hosts: front
 
-# 8) Frontend env + build + service (serve dist on :8081)
+# 8) Frontend: env, καθάρισμα localhost URLs, build, και systemd service (serve στο :8081)
 - import_playbook: frontend_env.yml
-- import_playbook: frontend_strip_localhost.yml   # ✅ ΠΡΟΣΩΡΙΝΑ (μέχρι να καθαρίσεις όλα τα views)
+- import_playbook: frontend_strip_localhost.yml
 - import_playbook: frontend_build.yml
 - import_playbook: frontend_service.yml
 
-# 9) Front Nginx (proxy :80 -> :8081, and /api -> backend:8080)
+# 9) Nginx στο front (reverse proxy :80 -> :8081 και /api -> backend:8080)
 - import_playbook: nginx_install.yml
   vars:
     target_hosts: front
@@ -86,9 +88,6 @@
   vars:
     target_hosts: front
 
-# 10) Optional one-time data (uncomment if you want)
-# - import_playbook: seed_db.yml
-# - import_playbook: load_photos_dbvm.yml
 
-# 11) Healthchecks
+# 10) Τελικοί έλεγχοι (DB, connectivity, ports, κτλ)
 - import_playbook: healthcheck.yml

@@ -1,14 +1,22 @@
 [Unit]
 Description=DS-2025 Frontend (static dist server)
+# Ξεκινά αφού είναι έτοιμο το network
 After=network-online.target
+# Ζητάει να ανέβει και το network-online
 Wants=network-online.target
 
 [Service]
+# Απλή υπηρεσία (τρέχει foreground process)
 Type=simple
 User={{ run_user }}
 WorkingDirectory={{ frontend_dir }}
 
 Environment=NODE_ENV=production
+# Εκκίνηση του frontend:
+# 1) φορτώνει NVM αν υπάρχει
+# 2) επιλέγει το default node version (αν γίνεται)
+# 3) πάει στο frontend dir
+# 4) σερβίρει το dist/ με npx serve στην πόρτα front_port
 ExecStart=/bin/bash -lc 'export NVM_DIR="$HOME/.nvm"; [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"; nvm use default >/dev/null 2>&1 || true; cd "{{ frontend_dir }}"; npx --yes serve -s dist -l {{ front_port }}'
 
 Restart=always
@@ -16,4 +24,5 @@ RestartSec=3
 SuccessExitStatus=143
 
 [Install]
+# Επιτρέπει enable ώστε να ξεκινά στο boot
 WantedBy=multi-user.target

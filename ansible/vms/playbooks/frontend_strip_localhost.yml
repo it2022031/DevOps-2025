@@ -6,10 +6,10 @@
 
   vars:
     frontend_dir: "/opt/DS-2025/frontend/vue-argon-design-system-master"
-    # allowlist patterns (lines allowed to contain localhost)
     allow_regex: "If it's absolute|strip host|example|docs|documentation|comment"
 
   tasks:
+    # Βρίσκουμε ποιος χρήστης θα κάνει τις αλλαγές στα αρχεία (vagrant/ubuntu/ansible_user)
     - name: Detect app_user
       set_fact:
         app_user: >-
@@ -31,11 +31,11 @@
         set -euo pipefail
         cd "{{ frontend_dir }}"
 
-        # Replace full API base first
+        # Πρώτα αντικαθιστούμε το πλήρες http://localhost:8080/api με /api
         find src -type f \( -name "*.vue" -o -name "*.js" \) -print0 \
           | xargs -0 sed -i 's|http://localhost:8080/api|/api|g'
 
-        # Replace any remaining host part
+        # Μετά αφαιρούμε ό,τι έμεινε από http://localhost:8080
         find src -type f \( -name "*.vue" -o -name "*.js" \) -print0 \
           | xargs -0 sed -i 's|http://localhost:8080||g'
       args:
@@ -57,14 +57,14 @@
       shell: |
         set -euo pipefail
         cd "{{ frontend_dir }}"
-        # show offenders, then fail
+        # Βρίσκουμε όσα έμειναν και δεν ταιριάζουν με τα επιτρεπτά patterns
         offenders="$(grep -R --line-number "http://localhost:8080" src | grep -Ev "{{ allow_regex }}" || true)"
         if [ -n "$offenders" ]; then
-          echo "❌ Found forbidden hardcoded localhost URLs:"
+          echo " Found forbidden hardcoded localhost URLs:"
           echo "$offenders"
           exit 1
         fi
-        echo "✅ No forbidden hardcoded localhost URLs found."
+        echo " No forbidden hardcoded localhost URLs found."
       args:
         executable: /bin/bash
       changed_when: false

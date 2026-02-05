@@ -1,4 +1,3 @@
-# 6) Frontend prerequisites (nvm/node/npm) + code
 - import_playbook: nvm_install.yml
 - import_playbook: nvm_verify.yml
 
@@ -6,12 +5,10 @@
   vars:
     target_hosts: front
 
-# 7) Frontend env + build + service (dist server)
 - import_playbook: frontend_env.yml
 - import_playbook: frontend_build.yml
 - import_playbook: frontend_service.yml
 
-# 8) Front Nginx (proxy :80 -> :8081, and /api -> backend)
 - import_playbook: nginx_install.yml
   vars:
     target_hosts: front
@@ -36,5 +33,4 @@
   vars:
     target_hosts: front
 
-# 9) Healthchecks (τρέξε το στο τέλος μία φορά)
 - import_playbook: healthcheck.yml
