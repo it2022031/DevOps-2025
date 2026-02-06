@@ -5,11 +5,13 @@ metadata:
   namespace: ds2025
 spec:
   accessModes:
+    # Το volume θα γίνεται mount από 1 node/pod τη φορά
     - ReadWriteOnce
   resources:
     requests:
+      # Ζητάμε 5Gi χώρο για τα δεδομένα της βάσης
       storage: 5Gi
-  storageClassName: microk8s-hostpath
+  storageClassName: microk8s-hostpath  # StorageClass του MicroK8s (hostpath πάνω στο VM)
 ---
 apiVersion: v1
 kind: Service
@@ -18,11 +20,15 @@ metadata:
   namespace: ds2025
 spec:
   selector:
+    # Στέλνει traffic στα pods με label app=postgres
     app: postgres
   ports:
     - name: postgres
+      # Port του service μέσα στο cluster
       port: 5432
+      # Port που ακούει το container
       targetPort: 5432
+  # Εσωτερικό service (μόνο μέσα στο cluster)
   type: ClusterIP
 ---
 apiVersion: apps/v1
@@ -31,6 +37,7 @@ metadata:
   name: postgres
   namespace: ds2025
 spec:
+  # “Σταθερή” ταυτότητα/δικτύωση για το StatefulSet
   serviceName: db
   replicas: 1
   selector:
@@ -41,7 +48,8 @@ spec:
       labels:
         app: postgres
     spec:
-      # --- INIT: prepare /photos from /photos_src (handles trailing-space folder) ---
+      # Init container: ετοιμάζει τον φάκελο /photos που περιμένει το load_photos.sql
+      # Παίρνει τα αρχεία από hostPath (/photos_src) και τα βάζει σε writable χώρο (/photos)
       initContainers:
         - name: prepare-photos
           image: busybox:1.36
@@ -51,15 +59,15 @@ spec:
               set -e
 
               mkdir -p /photos
-              # clear contents but DO NOT remove the mount point
+              # Καθαρίζουμε τα περιεχόμενα του /photos (χωρίς να σβήσουμε το mount point)
               rm -rf /photos/* /photos/.* 2>/dev/null || true
 
-              # copy avatars
+              # Αντιγραφή avatar_photos
               if [ -d "/photos_src/avatar_photos" ]; then
                 (cd /photos_src && tar -cf - avatar_photos) | (cd /photos && tar -xf -)
               fi
 
-              # copy property photos (handle trailing space)
+              # Αντιγραφή property_photos (χειρισμός περίπτωσης με trailing space στο όνομα φακέλου)
               if [ -d "/photos_src/property_photos " ]; then
                 (cd /photos_src && tar -cf - "property_photos ") | (cd /photos && tar -xf -)
                 rm -rf /photos/property_photos
@@ -80,7 +88,6 @@ spec:
             - name: photos-work
               mountPath: /photos
 
-
       containers:
         - name: postgres
           image: postgres:15
@@ -97,7 +104,6 @@ spec:
           volumeMounts:
             - name: pgdata
               mountPath: /var/lib/postgresql/data
-            # this is what load_photos.sql expects: /photos/...
             - name: photos-work
               mountPath: /photos
           readinessProbe:
@@ -116,12 +122,11 @@ spec:
           persistentVolumeClaim:
             claimName: pgdata
 
-        # read-only source from the VM (Vagrant synced folder inside k8shost)
         - name: photos-src
           hostPath:
             path: /vagrant/data/sqlData/photos
             type: Directory
 
-        # writable working dir inside the pod
+        # Προσωρινός writable χώρος μέσα στο pod (σβήνεται αν ξαναδημιουργηθεί το pod)
         - name: photos-work
           emptyDir: {}

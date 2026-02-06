@@ -1,12 +1,15 @@
+# Kubernetes Job που κάνει seed στη PostgreSQL (μία φορά) με SQL από ConfigMap
 apiVersion: batch/v1
 kind: Job
 metadata:
   name: postgres-seed
   namespace: ds2025
 spec:
+  # Πόσες φορές να ξαναπροσπαθήσει αν αποτύχει το Job
   backoffLimit: 1
   template:
     spec:
+      # Το Job δεν κάνει restart container σε loop (τρέχει μία φορά)
       restartPolicy: Never
       containers:
         - name: seed
@@ -15,20 +18,24 @@ spec:
             - name: PGPASSWORD
               value: demo_pass
           volumeMounts:
+            # Κάνουμε mount το SQL (από ConfigMap) μέσα στο /seed
             - name: seed-sql
               mountPath: /seed
           command:
             - sh
             - -lc
             - |
+              # Περιμένουμε μέχρι να είναι έτοιμη η PostgreSQL service (db:5432) στο cluster
               echo "Waiting for postgres..."
               until pg_isready -h db -p 5432 -U demo_user -d demo_db; do
                 sleep 2
               done
 
+              # Τρέχουμε το seed SQL αρχείο στη βάση (σταματάει αν υπάρξει error)
               echo "Running test_dedomena.sql..."
               psql -h db -U demo_user -d demo_db -v ON_ERROR_STOP=1 -f /seed/test_dedomena.sql
 
+              # Τέλος seed
               echo "Seed completed"
       volumes:
         - name: seed-sql
