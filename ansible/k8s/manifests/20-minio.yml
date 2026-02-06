@@ -1,22 +1,28 @@
+# PersistentVolumeClaim για αποθήκευση δεδομένων MinIO (object storage)
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: minio-data
   namespace: ds2025
 spec:
+  # Το volume μπορεί να γίνει mount μόνο από ένα pod κάθε φορά
   accessModes:
     - ReadWriteOnce
   resources:
     requests:
       storage: 5Gi
+  # Storage class του MicroK8s που αποθηκεύει δεδομένα στο host filesystem
   storageClassName: microk8s-hostpath
+
 ---
+# Service που δίνει network πρόσβαση στο MinIO μέσα στο cluster
 apiVersion: v1
 kind: Service
 metadata:
   name: minio
   namespace: ds2025
 spec:
+  # Το Service στέλνει traffic στα pods που έχουν label app=minio
   selector:
     app: minio
   ports:
@@ -62,21 +68,25 @@ spec:
             - containerPort: 9001
               name: console
           volumeMounts:
+            # Mount persistent storage στο /data
             - name: minio-data
               mountPath: /data
           readinessProbe:
+            # Έλεγχος αν το MinIO είναι έτοιμο να δεχτεί requests
             httpGet:
               path: /minio/health/ready
               port: 9000
             initialDelaySeconds: 5
             periodSeconds: 5
           livenessProbe:
+            # Έλεγχος αν το MinIO συνεχίζει να λειτουργεί σωστά
             httpGet:
               path: /minio/health/live
               port: 9000
             initialDelaySeconds: 15
             periodSeconds: 10
       volumes:
+        # Συνδέουμε το PVC με το pod ώστε τα δεδομένα να παραμένουν persistent
         - name: minio-data
           persistentVolumeClaim:
             claimName: minio-data

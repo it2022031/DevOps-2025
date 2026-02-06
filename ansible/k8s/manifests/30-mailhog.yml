@@ -1,20 +1,27 @@
+# Service που επιτρέπει στα pods μέσα στο cluster να επικοινωνούν με το MailHog
 apiVersion: v1
 kind: Service
 metadata:
   name: mailhog
   namespace: ds2025
 spec:
+  # Το Service κατευθύνει traffic στα pods που έχουν label app=mailhog
   selector:
     app: mailhog
   ports:
+    # SMTP port (εκεί στέλνει email το backend)
     - name: smtp
       port: 1025
       targetPort: 1025
+    # Web UI του MailHog για να βλέπουμε τα email
     - name: ui
       port: 8025
       targetPort: 8025
+  # Το Service είναι προσβάσιμο μόνο μέσα στο Kubernetes cluster
   type: ClusterIP
+
 ---
+# Deployment που τρέχει το MailHog pod
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -34,7 +41,9 @@ spec:
         - name: mailhog
           image: mailhog/mailhog
           ports:
+            # SMTP port (λαμβάνει emails από backend)
             - containerPort: 1025
               name: smtp
+            # Web UI port (προβολή emails από browser)
             - containerPort: 8025
               name: ui

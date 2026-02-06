@@ -1,9 +1,11 @@
+# Service που επιτρέπει στα άλλα pods του cluster να επικοινωνούν με το backend
 apiVersion: v1
 kind: Service
 metadata:
   name: backend
   namespace: ds2025
 spec:
+  # Το Service κατευθύνει traffic στα pods που έχουν label app=backend
   selector:
     app: backend
   ports:
@@ -11,6 +13,7 @@ spec:
       port: 8080
       targetPort: 8080
   type: ClusterIP
+
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -30,15 +33,15 @@ spec:
       containers:
         - name: backend
           image: ghcr.io/it2022031/ds2025-backend:latest
+          # Πάντα τραβάει την τελευταία έκδοση image
           imagePullPolicy: Always
           ports:
             - containerPort: 8080
           env:
-            # Use your docker profile (you already have application-docker.properties)
             - name: SPRING_PROFILES_ACTIVE
               value: docker
 
-            # DB (Service name "db")
+            # Ρυθμίσεις σύνδεσης στη βάση PostgreSQL μέσω Service "db"
             - name: SPRING_DATASOURCE_URL
               value: jdbc:postgresql://db:5432/demo_db
             - name: SPRING_DATASOURCE_USERNAME
@@ -46,28 +49,30 @@ spec:
             - name: SPRING_DATASOURCE_PASSWORD
               value: demo_pass
 
-            # MailHog (Service name "mailhog")
+            # Ρυθμίσεις MailHog για αποστολή email μέσα στο cluster
             - name: SPRING_MAIL_HOST
               value: mailhog
             - name: SPRING_MAIL_PORT
               value: "1025"
 
-            # MinIO (Service name "minio")
+            # Ρυθμίσεις MinIO για αποθήκευση αρχείων
             - name: MINIO_URL
               value: http://minio:9000
             - name: MINIO_ACCESS_KEY
               value: minioadmin
             - name: MINIO_SECRET_KEY
               value: minioadmin123
-            # Αυτό είναι το bucket που έχεις στα application(-docker).properties
+
+            # Bucket στο MinIO όπου αποθηκεύονται τα αρχεία
             - name: MINIO_BUCKET
               value: property-docs
 
-            # Public base for activation links (θα το αλλάξουμε όταν βάλουμε Ingress/FQDN)
+            # Public URL της εφαρμογής
             - name: APP_PUBLIC_BASE_URL
               value: "http://127.0.0.1:8082"
             - name: APP_FRONTEND_URL
               value: "http://127.0.0.1:8082"
+
+            # Επιτρεπόμενα origins για CORS
             - name: CORS_ALLOWED_ORIGINS
               value: "http://127.0.0.1,http://localhost,http://127.0.0.1:8082,http://localhost:8082"
-

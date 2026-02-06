@@ -1,13 +1,17 @@
+# Ingress που λειτουργεί σαν entry point για όλη την εφαρμογή (routing HTTP requests)
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: ds2025-ingress
   namespace: ds2025
 spec:
+  # Ορίζει ποιο ingress controller θα χειριστεί το traffic
   ingressClassName: public
+
   rules:
     - http:
         paths:
+          # Ό,τι request ξεκινά με /api στέλνεται στο backend service
           - path: /api
             pathType: Prefix
             backend:
@@ -15,6 +19,8 @@ spec:
                 name: backend
                 port:
                   number: 8080
+
+          # Όλα τα υπόλοιπα requests πηγαίνουν στο frontend service
           - path: /
             pathType: Prefix
             backend:

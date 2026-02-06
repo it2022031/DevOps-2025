@@ -1,12 +1,15 @@
+# Kubernetes Job που φορτώνει φωτογραφίες στη βάση με το load_photos.sql (τρέχει μία φορά)
 apiVersion: batch/v1
 kind: Job
 metadata:
   name: postgres-load-photos
   namespace: ds2025
 spec:
+  # Πόσες φορές θα ξαναπροσπαθήσει αν αποτύχει το Job
   backoffLimit: 1
   template:
     spec:
+      # Δεν κάνει restart το container συνεχώς – το Job εκτελείται μία φορά
       restartPolicy: Never
       containers:
         - name: load
