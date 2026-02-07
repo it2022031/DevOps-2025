@@ -12,7 +12,7 @@
     db_name: demo_db
 
   tasks:
-    - name: Ensure test_dedomena.sql exists on k8shost (synced folder)
+    - name: Ensure test_dedomena.sql exists on k8shost
       stat:
         path: "{{ sql_file_on_vm }}"
       register: sql_stat

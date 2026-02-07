@@ -24,14 +24,13 @@
         state: started
         enabled: true
 
-    - name: Wait for snap seeding to finish (prevents "too early")
+    - name: Wait for snap seeding to finish
       command: sudo snap wait system seed.loaded
       changed_when: false
 
     - name: Wait for snapd to be ready (seeding)
       shell: |
         set -e
-        # wait up to ~2 minutes for snapd seeding to complete
         for i in $(seq 1 60); do
           if snap list >/dev/null 2>&1; then
             echo "snapd is ready"
@@ -46,7 +45,7 @@
         executable: /bin/bash
       changed_when: false
 
-    - name: Install MicroK8s via snap (idempotent + retries)
+    - name: Install MicroK8s via snap
       shell: |
         set -e
         if ! snap list | awk '{print $1}' | grep -qx microk8s; then
@@ -80,7 +79,7 @@
       command: microk8s status --wait-ready
       changed_when: false
 
-    - name: Enable MicroK8s addons (safe rerun)
+    - name: Enable MicroK8s addons
       shell: |
         set -e
         for a in {{ addons | join(' ') }}; do
@@ -95,7 +94,7 @@
         executable: /bin/bash
       changed_when: false
 
-    - name: Write kubeconfig for vagrant (optional)
+    - name: Write kubeconfig for vagrant
       shell: |
         set -e
         sudo microk8s config > /home/vagrant/.kube/config
@@ -105,7 +104,8 @@
         executable: /bin/bash
       changed_when: false
 
-    - name: Create kubectl alias in vagrant .bashrc (optional)
+    # Alias ώστε το "kubectl" να σημαίνει "microk8s kubectl"
+    - name: Create kubectl alias in vagrant .bashrc
       lineinfile:
         path: /home/vagrant/.bashrc
         line: "alias kubectl='microk8s kubectl'"

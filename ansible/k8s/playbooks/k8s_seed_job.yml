@@ -1,62 +1,62 @@
----
-- name: Seed PostgreSQL in Kubernetes using sqlData (ConfigMap + Job)
-  hosts: k8s_nodes
-  become: true
-
-  vars:
-    ns: ds2025
-    seed_sql_on_vm: /vagrant/data/sqlData/test_dedomena.sql
-    job_manifest_on_vm: /vagrant/ansible/k8s/manifests/15-postgres-seed-job.yml
-
-  tasks:
-    - name: Ensure seed SQL exists on k8shost (synced folder)
-      stat:
-        path: "{{ seed_sql_on_vm }}"
-      register: sql_stat
-
-    - name: Fail if seed SQL missing
-      fail:
-        msg: "Missing {{ seed_sql_on_vm }}. Put test_dedomena.sql under /vagrant/data/sqlData/"
-      when: not sql_stat.stat.exists
-
-    - name: Create/update ConfigMap ds2025-seed-sql from sqlData/test_dedomena.sql
-      shell: |
-        set -e
-        microk8s kubectl -n {{ ns }} create configmap ds2025-seed-sql \
-          --from-file=test_dedomena.sql={{ seed_sql_on_vm }} \
-          --dry-run=client -o yaml | microk8s kubectl apply -f -
-      args:
-        executable: /bin/bash
-
-    - name: Delete old seed job if exists
-      shell: |
-        set -e
-        microk8s kubectl -n {{ ns }} delete job postgres-seed --ignore-not-found
-      args:
-        executable: /bin/bash
-
-    - name: Apply seed job manifest
-      shell: |
-        set -e
-        microk8s kubectl apply -f {{ job_manifest_on_vm }}
-      args:
-        executable: /bin/bash
-
-    - name: Wait for job completion
-      shell: |
-        set -e
-        microk8s kubectl -n {{ ns }} wait --for=condition=complete job/postgres-seed --timeout=300s
-      args:
-        executable: /bin/bash
-
-    - name: Show job logs
-      shell: |
-        set -e
-        microk8s kubectl -n {{ ns }} logs job/postgres-seed --tail=200
-      args:
-        executable: /bin/bash
-      register: job_logs
-      changed_when: false
-
-    - debug:
-        var: job_logs.stdout_lines
+#---
+#- name: Seed PostgreSQL in Kubernetes using sqlData (ConfigMap + Job)
+#  hosts: k8s_nodes
+#  become: true
+#
+#  vars:
+#    ns: ds2025
+#    seed_sql_on_vm: /vagrant/data/sqlData/test_dedomena.sql
+#    job_manifest_on_vm: /vagrant/ansible/k8s/manifests/15-postgres-seed-job.yml
+#
+#  tasks:
+#    - name: Ensure seed SQL exists on k8shost (synced folder)
+#      stat:
+#        path: "{{ seed_sql_on_vm }}"
+#      register: sql_stat
+#
+#    - name: Fail if seed SQL missing
+#      fail:
+#        msg: "Missing {{ seed_sql_on_vm }}. Put test_dedomena.sql under /vagrant/data/sqlData/"
+#      when: not sql_stat.stat.exists
+#
+#    - name: Create/update ConfigMap ds2025-seed-sql from sqlData/test_dedomena.sql
+#      shell: |
+#        set -e
+#        microk8s kubectl -n {{ ns }} create configmap ds2025-seed-sql \
+#          --from-file=test_dedomena.sql={{ seed_sql_on_vm }} \
+#          --dry-run=client -o yaml | microk8s kubectl apply -f -
+#      args:
+#        executable: /bin/bash
+#
+#    - name: Delete old seed job if exists
+#      shell: |
+#        set -e
+#        microk8s kubectl -n {{ ns }} delete job postgres-seed --ignore-not-found
+#      args:
+#        executable: /bin/bash
+#
+#    - name: Apply seed job manifest
+#      shell: |
+#        set -e
+#        microk8s kubectl apply -f {{ job_manifest_on_vm }}
+#      args:
+#        executable: /bin/bash
+#
+#    - name: Wait for job completion
+#      shell: |
+#        set -e
+#        microk8s kubectl -n {{ ns }} wait --for=condition=complete job/postgres-seed --timeout=300s
+#      args:
+#        executable: /bin/bash
+#
+#    - name: Show job logs
+#      shell: |
+#        set -e
+#        microk8s kubectl -n {{ ns }} logs job/postgres-seed --tail=200
+#      args:
+#        executable: /bin/bash
+#      register: job_logs
+#      changed_when: false
+#
+#    - debug:
+#        var: job_logs.stdout_lines

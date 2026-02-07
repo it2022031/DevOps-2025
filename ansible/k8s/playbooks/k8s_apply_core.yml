@@ -1,4 +1,5 @@
 ---
+# Εφαρμογή των βασικών Kubernetes manifests της εφαρμογής
 - name: Apply core Kubernetes manifests (ds2025)
   hosts: k8s
   become: true
@@ -6,6 +7,7 @@
   vars:
     ns: ds2025
     manifests_dir: /vagrant/ansible/k8s/manifests
+    #  path του microk8s binary
     microk8s_bin: /snap/bin/microk8s
     core_files:
       - 00-namespace.yml
@@ -27,7 +29,6 @@
       args:
         executable: /bin/bash
 
-    # Wait for core pods to be ready
     - name: Wait for Postgres pod ready
       shell: |
         set -e
