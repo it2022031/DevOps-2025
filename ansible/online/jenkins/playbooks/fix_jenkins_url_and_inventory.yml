@@ -7,13 +7,9 @@
     jenkins_port: 8080
     location_xml: /var/lib/jenkins/jenkins.model.JenkinsLocationConfiguration.xml
 
-    # Αν το repo σου είναι clone-αρισμένο στο Jenkins VM, βάλε εδώ το path.
-    # Από τα logs σου φαίνεται ότι το workspace είναι κάτω από /var/lib/jenkins/workspace/<job>
-    # Καλύτερα όμως να έχεις ΕΝΑ σταθερό clone, π.χ. /opt/DevOps-2025.
     repo_dir: /opt/DevOps-2025
     inventory_file: "{{ repo_dir }}/infra/inventories/cloud_jenkins.ini"
 
-    # Θες να ενημερώνει και το repo inventory;
     update_repo_inventory: true
 
   tasks:
@@ -25,14 +21,15 @@
     - name: Get current external IP (best-effort via metadata / fallback)
       shell: |
         set -e
-        # GCP metadata (works on GCE)
+        # Παίρνει το public IP του VM:
+        # 1) Αν είναι GCP VM, το metadata service δίνει το external IP.
+        # 2) Αλλιώς fallback σε ipify/ifconfig (public IP από έξω).
         if curl -s -m 2 -H "Metadata-Flavor: Google" \
           "http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip" >/dev/null; then
           curl -s -H "Metadata-Flavor: Google" \
             "http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip"
           exit 0
         fi
-        # Fallback (public IP services)
         curl -s -m 3 https://api.ipify.org || curl -s -m 3 https://ifconfig.me
       args:
         executable: /bin/bash
@@ -78,7 +75,9 @@
         - name: Update 'jenkins ansible_host=' line with current IP
           lineinfile:
             path: "{{ inventory_file }}"
+            # Πιάνει γραμμή τύπου: jenkins ansible_host=...
             regexp: '^jenkins\s+ansible_host='
+            # Γράφει το νέο IP ώστε το repo να “ξέρει” το τρέχον public IP του Jenkins VM.
             line: "jenkins ansible_host={{ ext_ip.stdout }} ansible_user=tefkros"
           when: inv_stat.stat.exists
 

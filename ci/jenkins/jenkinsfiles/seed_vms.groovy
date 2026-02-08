@@ -30,7 +30,7 @@ pipeline {
     }
 
     post {
-        success { echo '✅ seed-vms: OK' }
-        failure { echo '❌ seed-vms: FAILED' }
+        success { echo ' seed-vms: OK' }
+        failure { echo ' seed-vms: FAILED' }
     }
 }

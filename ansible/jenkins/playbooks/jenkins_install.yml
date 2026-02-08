@@ -4,7 +4,6 @@
   become: true
 
   tasks:
-    # --- Precheck: Jenkins already running (skip install) ---
     - name: Precheck Jenkins service active
       shell: "systemctl is-active --quiet jenkins && echo active || echo inactive"
       register: jenkins_active

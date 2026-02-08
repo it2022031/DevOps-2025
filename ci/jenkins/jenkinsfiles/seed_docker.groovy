@@ -30,7 +30,7 @@ pipeline {
     }
 
     post {
-        success { echo '✅ seed-docker: OK' }
-        failure { echo '❌ seed-docker: FAILED' }
+        success { echo ' seed-docker: OK' }
+        failure { echo ' seed-docker: FAILED' }
     }
 }

@@ -21,26 +21,26 @@ TARGET_PATTERN="backend:db:front"
 
 cd "$VAGRANT_DIR"
 
-# Ensure VMs are up (only the 3 you want)
-echo "🔧 Ensuring VMs are up: ${TARGETS[*]}"
+# Βεβαιώνουμε ότι οι VMs είναι up
+echo " Ensuring VMs are up: ${TARGETS[*]}"
 vagrant up "${TARGETS[@]}" >/dev/null
 
-# Wait for SSH readiness (prevents 'not yet ready for SSH')
+# Περιμένουμε να είναι έτοιμο το SSH
 for m in "${TARGETS[@]}"; do
-  echo "⏳ Waiting for SSH on $m..."
+  echo " Waiting for SSH on $m..."
   vagrant ssh "$m" -c "echo SSH_READY" >/dev/null
 done
 
-# Generate ssh config for these 3 (safe)
-echo "🔁 Generating $SSHCFG from vagrant for: ${TARGETS[*]}"
+# Δημιουργία ssh config για τις 3 VMs
+echo " Generating $SSHCFG from vagrant for: ${TARGETS[*]}"
 vagrant ssh-config "${TARGETS[@]}" > "$SSHCFG"
 
 cd "$ROOT"
 
-echo "🧪 Ansible ping..."
+echo " Ansible ping..."
 ansible -i "$INV" "$TARGET_PATTERN" -m ping
 
-# If backend_nodes/db_nodes groups exist, use them; otherwise fallback to hostnames
+# Αν υπάρχουν groups backend_nodes/db_nodes, τα χρησιμοποιούμε· αλλιώς fallback σε hostnames
 use_backend_nodes=0
 use_db_nodes=0
 ansible-inventory -i "$INV" --graph 2>/dev/null | grep -q "@backend_nodes" && use_backend_nodes=1
@@ -56,10 +56,10 @@ if [ "$use_backend_nodes" -eq 1 ] || [ "$use_db_nodes" -eq 1 ]; then
   load_limit=$([ "$use_db_nodes" -eq 1 ] && echo "db_nodes" || echo "db")
 fi
 
-echo "🌱 Seeding DB (limit: $seed_limit)"
+echo " Seeding DB (limit: $seed_limit)"
 ansible-playbook -i "$INV" "$SEED" --limit "$seed_limit"
 
-echo "🖼️ Loading photos (limit: $load_limit)"
+echo " Loading photos (limit: $load_limit)"
 ansible-playbook -i "$INV" "$LOAD" --limit "$load_limit"
 
-echo "✅ Seed VMs done."
+echo " Seed VMs done."

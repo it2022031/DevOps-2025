@@ -23,6 +23,9 @@
     - name: Get current external IP (GCP metadata, fallback to ipify/ifconfig)
       shell: |
         set -e
+        # Παίρνουμε το public IP του VM:
+        # 1) Αν τρέχει σε GCP, δοκιμάζουμε πρώτα το metadata service (πιο αξιόπιστο εκεί)
+        # 2) Αλλιώς fallback σε ipify/ifconfig (public IP που “βλέπει” το Internet)
         if curl -s -m 2 -H "Metadata-Flavor: Google" \
           "http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip" >/dev/null; then
           curl -s -H "Metadata-Flavor: Google" \
@@ -62,7 +65,10 @@
     - name: Detect theme config files referencing old IP or theme-dark
       shell: |
         set -e
-        # Search only in top-level XML configs and plugin configs (fast)
+        # Ψάχνει μέσα στο JENKINS_HOME για “ύποπτες” αναφορές:
+        # - theme-dark / theme.css
+        # - ή hardcoded URL τύπου http://<IP>:8080/theme...
+        # ώστε να δούμε αν κάπου έχει μείνει παλιό IP ή theme config
         grep -RIn --include="*.xml" -E "theme-dark|theme\.css|http://[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+:{{ jenkins_port }}/theme" "{{ jenkins_home }}" \
           | head -n 200 || true
       args:
@@ -77,8 +83,10 @@
     - name: Fix hardcoded old IP occurrences pointing to Jenkins port (best-effort replace to current IP)
       shell: |
         set -e
-        # Replace any http://<old-ip>:8080/ with current Jenkins URL in Jenkins home xml files
-        # (safe-ish because only xml; keeps rest same)
+        # Best-effort “καθάρισμα”:
+        # Σε ολα τα XML μέσα στο JENKINS_HOME, αν βρει http://<old-ip>:8080/ το αλλάζει
+        # στο τρέχον desired_jenkins_url.
+        # Έτσι διορθώνονται παλιά hardcoded URLs 
         for f in $(grep -RIl --include="*.xml" -E "http://[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+:{{ jenkins_port }}/" "{{ jenkins_home }}" || true); do
           sed -i -E "s|http://[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+:{{ jenkins_port }}/|{{ desired_jenkins_url }}|g" "$f"
         done
@@ -88,9 +96,12 @@
       changed_when: theme_rewrite.rc == 0
 
     - name: Optionally disable theme plugins if theme references were detected
+      # Αν βρέθηκαν theme references , τότε απενεργοποιούμε theme plugins
+      # για να μην ξαναγράφουν theme CSS ή να φορτώνουν λάθος URL.
       when: disable_theme_plugins_if_detected and (theme_hits.stdout | length > 0)
       block:
         - name: Stop Jenkins before disabling plugins
+          # Σταματάμε Jenkins για να κάνουμε safe αλλαγές στα plugins
           service:
             name: jenkins
             state: stopped
@@ -98,6 +109,9 @@
         - name: Disable theme plugins (create .jpi.disabled if plugin exists)
           shell: |
             set -e
+            # Για κάθε πιθανό plugin όνομα:
+            # αν υπάρχει plugins/<name>.jpi, δημιουργούμε <name>.jpi.disabled
+            # -> Jenkins το θεωρεί disabled στο next start
             for p in {{ theme_plugin_candidates | join(' ') }}; do
               if [ -f "{{ jenkins_home }}/plugins/${p}.jpi" ]; then
                 touch "{{ jenkins_home }}/plugins/${p}.jpi.disabled"

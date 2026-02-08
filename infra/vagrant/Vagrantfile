@@ -94,7 +94,7 @@ Vagrant.configure("2") do |config|
       ip: "192.168.56.105",
       netmask: "255.255.255.0"
 
-    # Optional: expose ingress HTTP/HTTPS from the k8s VM to your host
+    # Optional: expose ingress HTTP/HTTPS from the k8s VM to host
     h.vm.network "forwarded_port", guest: 80, host: 8082, auto_correct: true
     h.vm.network "forwarded_port", guest: 443, host: 8443, auto_correct: true
 

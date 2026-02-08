@@ -42,6 +42,7 @@ pipeline {
             steps {
                 sh '''
           set -e
+          # Εκτέλεση του playbook που κάνει deploy το DS2025 σε MicroK8s (cloud) και ρυθμίζει Nginx/HTTPS στο host
           ansible-playbook \
             -i infra/inventories/cloud_k8s.ini \
             ansible/online/k8s/playbooks/site_k8s_online_nginx.yml \
@@ -50,12 +51,12 @@ pipeline {
             }
         }
 
-        stage('Quick status (optional)') {
+        stage('Quick status ') {
             steps {
                 sh '''
           set -e
-          # Αν το inventory έχει host/group για k8s node, εδώ βγάζουμε μια γρήγορη εικόνα.
-          # Αν το microk8s είναι installed, θα δεις pods/svc/ingress.
+          # Προαιρετικός έλεγχος κατάστασης cluster (pods/services/ingress) για γρήγορη εικόνα μετά το deploy
+          # Αν microk8s δεν είναι εγκατεστημένο σε κάποιο host, το || true αποτρέπει να αποτύχει όλο το pipeline
           ansible -i infra/inventories/cloud_k8s.ini all -b -m shell -a "microk8s kubectl -n ds2025 get pods,svc,ingress -o wide" || true
         '''
             }
@@ -63,7 +64,7 @@ pipeline {
     }
 
     post {
-        success { echo '✅ deploy-k8s-online-nginx: OK' }
-        failure { echo '❌ deploy-k8s-online-nginx: FAILED (δες Console Output)' }
+        success { echo ' deploy-k8s-online-nginx: OK' }
+        failure { echo ' deploy-k8s-online-nginx: FAILED (δες Console Output)' }
     }
 }

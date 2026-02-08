@@ -28,7 +28,7 @@ pipeline {
           # Περιμένει να ανοίξει το SSH port του k8shost πριν ξεκινήσουν τα Ansible playbooks
           for i in $(seq 1 30); do
             if timeout 2 bash -lc "cat < /dev/null > /dev/tcp/${K8S_IP}/22" 2>/dev/null; then
-              echo "✅ SSH port is open on ${K8S_IP}"
+              echo " SSH port is open on ${K8S_IP}"
               exit 0
             fi
             sleep 2

@@ -15,13 +15,14 @@ mkdir -p "$ROOT/infra/ssh"
 
 cd "$VAGRANT_DIR"
 
-echo "🔧 Ensuring VM is up: dockerhost"
+echo " Ensuring VM is up: dockerhost"
+# Εκκινείται (ή επιβεβαιώνεται ότι τρέχει) το VM dockerhost
 vagrant up dockerhost >/dev/null
 
-echo "⏳ Waiting for SSH on dockerhost..."
+echo " Waiting for SSH on dockerhost..."
 vagrant ssh dockerhost -c "echo SSH_READY" >/dev/null
 
-# Generate ssh config for all running machines (so it never breaks other scripts)
+# Δημιουργείται ssh-config μόνο για τα VMs που είναι running, ώστε να μην σπάνε άλλα scripts
 machines=()
 for m in backend db front dockerhost k8shost jenkins; do
   st="$(vagrant status "$m" --machine-readable 2>/dev/null | awk -F, '$3=="state" {print $4}' | tail -n1 || true)"
@@ -30,13 +31,13 @@ for m in backend db front dockerhost k8shost jenkins; do
   fi
 done
 
-echo "🔁 Generating $SSHCFG from vagrant for: ${machines[*]}"
+echo " Generating $SSHCFG from vagrant for: ${machines[*]}"
 vagrant ssh-config "${machines[@]}" > "$SSHCFG"
 
 cd "$ROOT"
 
-echo "🧪 Ansible ping (docker)..."
+echo " Ansible ping (docker)..."
 ansible -i "$INV" docker_nodes -m ping
 
-echo "🚀 Deploy docker stack..."
+echo " Deploy docker stack..."
 ansible-playbook -i "$INV" "$PLAYBOOK" --limit docker_nodes

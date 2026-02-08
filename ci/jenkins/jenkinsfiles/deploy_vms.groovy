@@ -6,9 +6,9 @@ pipeline {
         ANSIBLE_HOST_KEY_CHECKING = "False"
         ANSIBLE_CONFIG = "infra/ansible/ansible-jenkins.cfg"
 
-        // Force correct SSH identity for Jenkins → VMs
         ANSIBLE_PRIVATE_KEY_FILE = "/var/lib/jenkins/.ssh/jenkins_id"
         ANSIBLE_USER = "vagrant"
+        // SSH options: απενεργοποίηση strict host key checking για να μην μπλοκάρει σε πρώτο connect
         ANSIBLE_SSH_COMMON_ARGS = "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
     }
 
@@ -28,7 +28,6 @@ pipeline {
             steps {
                 sh '''
           set -e
-          # Use Jenkins-safe playbook
           ansible-playbook -i infra/inventories/hosts_jenkins.ini ansible/vms/playbooks/site_jenkins.yml --limit vms
         '''
             }
@@ -45,7 +44,7 @@ pipeline {
     }
 
     post {
-        success { echo '✅ Deploy VMs succeeded' }
-        failure { echo '❌ Deploy VMs failed (see Console Output)' }
+        success { echo ' Deploy VMs succeeded' }
+        failure { echo ' Deploy VMs failed (see Console Output)' }
     }
 }

@@ -30,7 +30,7 @@ pipeline {
     }
 
     post {
-        success { echo '✅ seed-k8s: OK' }
-        failure { echo '❌ seed-k8s: FAILED' }
+        success { echo ' seed-k8s: OK' }
+        failure { echo ' seed-k8s: FAILED' }
     }
 }

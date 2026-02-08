@@ -30,7 +30,7 @@ pipeline {
     }
 
     post {
-        success { echo '✅ load-photos-vms-online: OK' }
-        failure { echo '❌ load-photos-vms-online: FAILED' }
+        success { echo ' load-photos-vms-online: OK' }
+        failure { echo ' load-photos-vms-online: FAILED' }
     }
 }

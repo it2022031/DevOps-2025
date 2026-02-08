@@ -8,7 +8,6 @@ pipeline {
         ANSIBLE_TIMEOUT = "30"
     }
 
-
     stages {
         stage('Checkout') {
             steps { checkout scm }
@@ -63,7 +62,7 @@ pipeline {
     }
 
     post {
-        success { echo '✅ deploy-vms-online-nginx: OK' }
-        failure { echo '❌ deploy-vms-online-nginx: FAILED (δες Console Output)' }
+        success { echo ' deploy-vms-online-nginx: OK' }
+        failure { echo ' deploy-vms-online-nginx: FAILED (δες Console Output)' }
     }
 }

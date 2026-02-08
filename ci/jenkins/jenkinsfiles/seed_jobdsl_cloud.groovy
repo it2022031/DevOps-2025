@@ -3,7 +3,6 @@ pipeline {
     options { timestamps() }
 
     environment {
-        // Καλό να υπάρχει για να μην κολλάει με hosts/ssh αν σε άλλα jobs τρέχει ansible
         ANSIBLE_HOST_KEY_CHECKING = "False"
     }
 

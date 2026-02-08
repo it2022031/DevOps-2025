@@ -17,13 +17,13 @@ mkdir -p "$ROOT/infra/ssh"
 
 cd "$VAGRANT_DIR"
 
-echo "🔧 Ensuring VM is up: k8shost"
+echo " Ensuring VM is up: k8shost"
 vagrant up k8shost >/dev/null
 
-echo "⏳ Waiting for SSH on k8shost..."
+echo " Waiting for SSH on k8shost..."
 vagrant ssh k8shost -c "echo SSH_READY" >/dev/null
 
-# Generate ssh config for all running machines (never breaks other scripts)
+# Δημιουργία ssh config για όλα τα VMs που τρέχουν
 machines=()
 for m in backend db front dockerhost k8shost jenkins; do
   st="$(vagrant status "$m" --machine-readable 2>/dev/null | awk -F, '$3=="state" {print $4}' | tail -n1 || true)"
@@ -32,18 +32,18 @@ for m in backend db front dockerhost k8shost jenkins; do
   fi
 done
 
-echo "🔁 Generating $SSHCFG from vagrant for: ${machines[*]}"
+echo " Generating $SSHCFG from vagrant for: ${machines[*]}"
 vagrant ssh-config "${machines[@]}" > "$SSHCFG"
 
 cd "$ROOT"
 
-echo "🧪 Ansible ping (k8s)..."
+echo " Ansible ping (k8s)..."
 ansible -i "$INV" k8s -m ping
 
-echo "🌱 Seed k8s DB..."
+echo " Seed k8s DB..."
 ansible-playbook -i "$INV" "$SEED" --limit k8s
 
-echo "🖼️ Load k8s photos..."
+echo " Load k8s photos..."
 ansible-playbook -i "$INV" "$LOAD" --limit k8s
 
-echo "✅ Seed k8s done."
+echo " Seed k8s done."
