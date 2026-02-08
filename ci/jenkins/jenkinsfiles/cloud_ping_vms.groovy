@@ -17,7 +17,6 @@ pipeline {
           set -e
           ansible --version
 
-          # Ping σε ΟΛΑ τα cloud hosts που έχεις στο cloud.ini
           ansible -i infra/inventories/cloud.ini vms:docker:k8s -m ping
         '''
             }
@@ -25,7 +24,7 @@ pipeline {
     }
 
     post {
-        success { echo '✅ ping-cloud: OK' }
-        failure { echo '❌ ping-cloud: FAILED (δες Console Output)' }
+        success { echo ' ping-cloud: OK' }
+        failure { echo ' ping-cloud: FAILED (δες Console Output)' }
     }
 }

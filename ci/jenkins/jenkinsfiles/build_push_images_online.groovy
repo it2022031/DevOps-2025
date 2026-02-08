@@ -16,11 +16,14 @@ pipeline {
                 withCredentials([string(credentialsId: 'github-packages-token', variable: 'GHCR_TOKEN')]) {
                     sh '''
             set -e
+
             test -f infra/inventories/cloud_docker.ini
             test -f ansible/docker/playbooks/build_push_images.yml
 
+            # Γρήγορος έλεγχος σύνδεσης με τα hosts του inventory (ansible ping)
             ansible -i infra/inventories/cloud_docker.ini docker_nodes -m ping
             ansible -i infra/inventories/cloud_docker.ini docker -m ping
+            # -v: verbose output για troubleshooting
             ansible-playbook \
               -i infra/inventories/cloud_docker.ini \
               ansible/docker/playbooks/build_push_images.yml \
@@ -34,7 +37,7 @@ pipeline {
     }
 
     post {
-        success { echo "✅ Images built & pushed to GHCR (ONLINE)" }
-        failure { echo "❌ Build/push failed (ONLINE)" }
+        success { echo " Images built & pushed to GHCR (ONLINE)" }
+        failure { echo " Build/push failed (ONLINE)" }
     }
 }

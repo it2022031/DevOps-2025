@@ -1,12 +1,7 @@
 ---
-# 1) Install / bootstrap microk8s
+# Εκτελούμε πρώτα το playbook εγκατάστασης και αρχικής ρύθμισης του MicroK8s cluster
 - import_playbook: microk8s_install.yml
 
-# 2) Apply core manifests (namespace, db/minio/mailhog/backend/frontend/ingress + waits)
+# Στη συνέχεια εφαρμόζουμε όλα τα βασικά Kubernetes manifests της εφαρμογής (db, minio, mailhog, backend, frontend, ingress)
 - import_playbook: k8s_apply_core.yml
 
-## 3) Seed DB (Job 15 + sanity checks)
-#- import_playbook: k8s_seed_db.yml
-#
-## 4) Load photos (Job 16 + sanity checks)
-#- import_playbook: k8s_load_photos.yml

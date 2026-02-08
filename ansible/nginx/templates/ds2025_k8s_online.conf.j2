@@ -1,18 +1,28 @@
-server {
-  listen 80;
-  server_name _;
-
-  location / {
-    proxy_pass http://127.0.0.1:80;
-    proxy_set_header Host $host;
-    proxy_set_header X-Real-IP $remote_addr;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto $scheme;
-  }
-
-  location /mailhog/ {
-    proxy_pass http://127.0.0.1:18025/;
-    proxy_set_header Host $host;
-    proxy_set_header X-Real-IP $remote_addr;
-  }
-}
+{## Reverse proxy config για πρόσβαση στην εφαρμογή που τρέχει μέσω MicroK8s ingress#}
+{#server {#}
+{#    listen 80;#}
+{#    server_name _;#}
+{##}
+{#    # Όλα τα βασικά requests της εφαρμογής προωθούνται στο ingress του MicroK8s#}
+{#    # Το ingress controller ακούει στο localhost:80 και κάνει routing σε frontend/backend#}
+{#    location / {#}
+{#        proxy_pass http://127.0.0.1:80;#}
+{##}
+{#        # Forward βασικά headers ώστε το backend να γνωρίζει τον πραγματικό client#}
+{#        proxy_set_header Host $host;#}
+{#        proxy_set_header X-Real-IP $remote_addr;#}
+{#        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;#}
+{#        proxy_set_header X-Forwarded-Proto $scheme;#}
+{#    }#}
+{##}
+{#    # Proxy προς MailHog UI#}
+{#    # Το 18025 είναι local port-forward από Kubernetes Service mailhog:8025#}
+{#    location /mailhog/ {#}
+{#        proxy_pass http://127.0.0.1:18025/;#}
+{##}
+{#        proxy_set_header Host $host;#}
+{#        proxy_set_header X-Real-IP $remote_addr;#}
+{##}
+{#        # Το MailHog χρησιμοποιεί relative paths, γι' αυτό κρατάμε το trailing slash#}
+{#    }#}
+{#}#}

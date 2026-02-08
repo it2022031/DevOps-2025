@@ -6,9 +6,10 @@ pipeline {
         ANSIBLE_HOST_KEY_CHECKING = "False"
         ANSIBLE_CONFIG = "infra/ansible/ansible-jenkins.cfg"
 
-        // Force correct SSH identity (Jenkins → VMs)
         ANSIBLE_PRIVATE_KEY_FILE = "/var/lib/jenkins/.ssh/jenkins_id"
         ANSIBLE_USER = "vagrant"
+
+        // SSH options: χωρίς StrictHostKeyChecking/known_hosts και μικρό connect timeout
         ANSIBLE_SSH_COMMON_ARGS = "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=5"
         ANSIBLE_TIMEOUT = "30"
     }
@@ -24,6 +25,7 @@ pipeline {
           set -e
           K8S_IP="192.168.56.105"
           echo "Waiting for SSH on ${K8S_IP}:22 ..."
+          # Περιμένει να ανοίξει το SSH port του k8shost πριν ξεκινήσουν τα Ansible playbooks
           for i in $(seq 1 30); do
             if timeout 2 bash -lc "cat < /dev/null > /dev/tcp/${K8S_IP}/22" 2>/dev/null; then
               echo "✅ SSH port is open on ${K8S_IP}"
@@ -31,7 +33,8 @@ pipeline {
             fi
             sleep 2
           done
-          echo "❌ k8shost SSH (22) is not reachable. Make sure the VM is up (vagrant up k8shost) and Jenkins key is authorized."
+          # Αν δεν ανοίξει
+          echo " k8shost SSH (22) is not reachable. Make sure the VM is up (vagrant up k8shost) and Jenkins key is authorized."
           exit 1
         '''
             }
@@ -68,6 +71,7 @@ pipeline {
             steps {
                 sh '''
           set -e
+
           ansible -i infra/inventories/hosts_jenkins.ini k8s_nodes -b -m shell -a "microk8s kubectl -n ds2025 get pods,svc,ingress -o wide" || true
         '''
             }
@@ -75,7 +79,7 @@ pipeline {
     }
 
     post {
-        success { echo '✅ K8s deploy succeeded' }
-        failure { echo '❌ K8s deploy failed (see Console Output)' }
+        success { echo 'K8s deploy succeeded' }
+        failure { echo ' K8s deploy failed (see Console Output)' }
     }
 }

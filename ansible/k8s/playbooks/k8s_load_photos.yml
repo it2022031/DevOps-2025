@@ -85,7 +85,7 @@
     - debug:
         var: prop_count.stdout_lines
 
-    # Έλεγχος: δείγμα χρηστών και μέγεθος (bytes) του avatar blob για να δούμε ότι φορτώθηκαν εικόνες
+    # Έλεγχος: δείγμα χρηστών και μέγεθος του avatar blob για να δούμε ότι φορτώθηκαν εικόνες
     - name: Sanity check avatars bytes (sample)
       shell: |
         set -e
