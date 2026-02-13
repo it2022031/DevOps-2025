@@ -1,31 +1,31 @@
-- name: Expose MailHog via NodePort (K8s online)
-  hosts: k8s_nodes
-  become: true
-
-  vars:
-    mailhog_nodeport_http: 30025   # Web UI
-    mailhog_nodeport_smtp: 31025   # SMTP (προαιρετικό)
-
-  tasks:
-    - name: Patch MailHog service to NodePort
-      shell: |
-        set -e
-        microk8s kubectl -n ds2025 patch svc mailhog -p "
-        spec:
-          type: NodePort
-          ports:
-            - name: smtp
-              port: 1025
-              targetPort: 1025
-              nodePort: {{ mailhog_nodeport_smtp }}
-            - name: http
-              port: 8025
-              targetPort: 8025
-              nodePort: {{ mailhog_nodeport_http }}
-        "
-      changed_when: true
-
-    - name: Show MailHog service
-      shell: |
-        microk8s kubectl -n ds2025 get svc mailhog -o wide
-      changed_when: false
+#- name: Expose MailHog via NodePort (K8s online)
+#  hosts: k8s_nodes
+#  become: true
+#
+#  vars:
+#    mailhog_nodeport_http: 30025   # Web UI
+#    mailhog_nodeport_smtp: 31025   # SMTP (προαιρετικό)
+#
+#  tasks:
+#    - name: Patch MailHog service to NodePort
+#      shell: |
+#        set -e
+#        microk8s kubectl -n ds2025 patch svc mailhog -p "
+#        spec:
+#          type: NodePort
+#          ports:
+#            - name: smtp
+#              port: 1025
+#              targetPort: 1025
+#              nodePort: {{ mailhog_nodeport_smtp }}
+#            - name: http
+#              port: 8025
+#              targetPort: 8025
+#              nodePort: {{ mailhog_nodeport_http }}
+#        "
+#      changed_when: true
+#
+#    - name: Show MailHog service
+#      shell: |
+#        microk8s kubectl -n ds2025 get svc mailhog -o wide
+#      changed_when: false
