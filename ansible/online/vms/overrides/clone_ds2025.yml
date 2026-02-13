@@ -6,8 +6,8 @@
   vars:
     repo_url: "https://github.com/it2022031/DS-2025.git"
     project_dir: "/opt/DS-2025"
-    repo_version: "main-branch"           # ✅ όπως είπες
-    app_owner: "{{ ansible_user }}"       # ✅ όχι vagrant
+    repo_version: "main-branch"
+    app_owner: "{{ ansible_user }}"
     version_file: "/opt/DS-2025/VERSION"
 
   tasks:

@@ -1,74 +1,74 @@
----
-- name: Deploy DS-2025 on MicroK8s (online) + HTTPS reverse proxy (Caddy)
-  hosts: k8s_nodes
-  become: true
-
-  vars:
-    public_fqdn: "ds2025.example.com"   # <-- άλλαξέ το
-    public_base_url: "https://{{ public_fqdn }}"
-
-  tasks:
-    # 1) Install MicroK8s using your existing playbook logic
-    - name: Install MicroK8s
-      import_playbook: ../../k8s/playbooks/microk8s_install.yml
-
-    # 2) Apply your existing core manifests (namespace, postgres, minio, mailhog, backend, frontend, ingress)
-    - name: Apply DS2025 manifests (core)
-      import_playbook: ../../k8s/playbooks/k8s_apply_core.yml
-
-    # 3) Online overrides (do NOT change your manifests; patch runtime env)
-    - name: Set backend public URLs (APP_PUBLIC_BASE_URL / APP_FRONTEND_URL)
-      shell: |
-        set -e
-        microk8s kubectl -n ds2025 set env deploy/backend \
-          APP_PUBLIC_BASE_URL="{{ public_base_url }}" \
-          APP_FRONTEND_URL="{{ public_base_url }}"
-      changed_when: true
-
-    - name: Set backend CORS for online FQDN
-      shell: |
-        set -e
-        microk8s kubectl -n ds2025 set env deploy/backend \
-          CORS_ALLOWED_ORIGINS="{{ public_base_url }},http://{{ public_fqdn }}"
-      changed_when: true
-
-    - name: Restart backend to apply env
-      shell: |
-        set -e
-        microk8s kubectl -n ds2025 rollout restart deploy/backend
-        microk8s kubectl -n ds2025 rollout status deploy/backend --timeout=180s
-      changed_when: true
-
-    # 4) Install Caddy for HTTPS (best effort)
-    - name: Install Caddy
-      apt:
-        name: caddy
-        state: present
-        update_cache: yes
-
-    - name: Deploy Caddyfile
-      template:
-        src: ../files/Caddyfile.j2
-        dest: /etc/caddy/Caddyfile
-        mode: "0644"
-      notify: restart caddy
-
-    - name: Ensure Caddy running
-      service:
-        name: caddy
-        state: started
-        enabled: yes
-
-    - name: Show quick status
-      shell: |
-        set -e
-        echo "== pods ==" && microk8s kubectl -n ds2025 get pods -o wide
-        echo "== svc ==" && microk8s kubectl -n ds2025 get svc -o wide
-        echo "== ingress ==" && microk8s kubectl -n ds2025 get ingress -o wide
-      changed_when: false
-
-  handlers:
-    - name: restart caddy
-      service:
-        name: caddy
-        state: restarted
+#---
+#- name: Deploy DS-2025 on MicroK8s (online) + HTTPS reverse proxy (Caddy)
+#  hosts: k8s_nodes
+#  become: true
+#
+#  vars:
+#    public_fqdn: "ds2025.example.com"   # <-- άλλαξέ το
+#    public_base_url: "https://{{ public_fqdn }}"
+#
+#  tasks:
+#    # 1) Install MicroK8s using your existing playbook logic
+#    - name: Install MicroK8s
+#      import_playbook: ../../k8s/playbooks/microk8s_install.yml
+#
+#    # 2) Apply your existing core manifests (namespace, postgres, minio, mailhog, backend, frontend, ingress)
+#    - name: Apply DS2025 manifests (core)
+#      import_playbook: ../../k8s/playbooks/k8s_apply_core.yml
+#
+#    # 3) Online overrides (do NOT change your manifests; patch runtime env)
+#    - name: Set backend public URLs (APP_PUBLIC_BASE_URL / APP_FRONTEND_URL)
+#      shell: |
+#        set -e
+#        microk8s kubectl -n ds2025 set env deploy/backend \
+#          APP_PUBLIC_BASE_URL="{{ public_base_url }}" \
+#          APP_FRONTEND_URL="{{ public_base_url }}"
+#      changed_when: true
+#
+#    - name: Set backend CORS for online FQDN
+#      shell: |
+#        set -e
+#        microk8s kubectl -n ds2025 set env deploy/backend \
+#          CORS_ALLOWED_ORIGINS="{{ public_base_url }},http://{{ public_fqdn }}"
+#      changed_when: true
+#
+#    - name: Restart backend to apply env
+#      shell: |
+#        set -e
+#        microk8s kubectl -n ds2025 rollout restart deploy/backend
+#        microk8s kubectl -n ds2025 rollout status deploy/backend --timeout=180s
+#      changed_when: true
+#
+#    # 4) Install Caddy for HTTPS (best effort)
+#    - name: Install Caddy
+#      apt:
+#        name: caddy
+#        state: present
+#        update_cache: yes
+#
+#    - name: Deploy Caddyfile
+#      template:
+#        src: ../files/Caddyfile.j2
+#        dest: /etc/caddy/Caddyfile
+#        mode: "0644"
+#      notify: restart caddy
+#
+#    - name: Ensure Caddy running
+#      service:
+#        name: caddy
+#        state: started
+#        enabled: yes
+#
+#    - name: Show quick status
+#      shell: |
+#        set -e
+#        echo "== pods ==" && microk8s kubectl -n ds2025 get pods -o wide
+#        echo "== svc ==" && microk8s kubectl -n ds2025 get svc -o wide
+#        echo "== ingress ==" && microk8s kubectl -n ds2025 get ingress -o wide
+#      changed_when: false
+#
+#  handlers:
+#    - name: restart caddy
+#      service:
+#        name: caddy
+#        state: restarted
