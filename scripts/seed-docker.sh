@@ -38,12 +38,12 @@ vagrant ssh-config "${machines[@]}" > "$SSHCFG"
 cd "$ROOT"
 
 echo " Ansible ping (docker)..."
-ansible -i "$INV" docker -m ping
+ansible -i "$INV" docker_nodes -m ping
 
 echo " Seed docker DB..."
-ansible-playbook -i "$INV" "$SEED" --limit docker
+ansible-playbook -i "$INV" "$SEED" --limit docker_nodes
 
 echo " Load docker photos..."
-ansible-playbook -i "$INV" "$LOAD" --limit docker
+ansible-playbook -i "$INV" "$LOAD" --limit docker_nodes
 
 echo " Seed docker done."

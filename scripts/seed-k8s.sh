@@ -38,12 +38,12 @@ vagrant ssh-config "${machines[@]}" > "$SSHCFG"
 cd "$ROOT"
 
 echo " Ansible ping (k8s)..."
-ansible -i "$INV" k8s -m ping
+ansible -i "$INV" k8s_nodes -m ping
 
 echo " Seed k8s DB..."
-ansible-playbook -i "$INV" "$SEED" --limit k8s
+ansible-playbook -i "$INV" "$SEED" --limit k8s_nodes
 
 echo " Load k8s photos..."
-ansible-playbook -i "$INV" "$LOAD" --limit k8s
+ansible-playbook -i "$INV" "$LOAD" --limit k8s_nodes
 
 echo " Seed k8s done."

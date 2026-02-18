@@ -21,7 +21,7 @@ pipeline {
 
             # Περνάμε το token ως extra-var ώστε να γίνει docker login στο GHCR και push των images
             ansible-playbook -i infra/inventories/hosts_jenkins.ini ansible/docker/playbooks/build_push_images.yml \
-              --limit docker \
+              --limit docker_nodes \
               -e "ghcr_token=$GHCR_TOKEN"
           '''
                 }

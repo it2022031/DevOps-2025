@@ -10,6 +10,7 @@ SSHCFG="$ROOT/infra/ssh/ssh.config"
 export ANSIBLE_CONFIG="$ROOT/infra/ansible/ansible-local.cfg"
 export ANSIBLE_REMOTE_TEMP="/tmp/.ansible-local/tmp"
 export ANSIBLE_HOST_KEY_CHECKING="False"
+export ANSIBLE_SSH_ARGS="-F $SSHCFG -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
 
 mkdir -p "$ROOT/infra/ssh"
 

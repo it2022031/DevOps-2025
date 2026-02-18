@@ -14,7 +14,7 @@ pipeline {
             steps {
                 sh '''
           set -e
-          ansible-playbook -i infra/inventories/hosts_jenkins.ini ansible/docker/playbooks/docker_seed_like_k8s.yml --limit docker
+          ansible-playbook -i infra/inventories/hosts_jenkins.ini ansible/docker/playbooks/docker_seed_like_k8s.yml --limit docker_nodes
         '''
             }
         }
@@ -23,7 +23,7 @@ pipeline {
             steps {
                 sh '''
           set -e
-          ansible-playbook -i infra/inventories/hosts_jenkins.ini ansible/docker/playbooks/docker_load_photos_like_k8s.yml --limit docker
+          ansible-playbook -i infra/inventories/hosts_jenkins.ini ansible/docker/playbooks/docker_load_photos_like_k8s.yml --limit docker_nodes
         '''
             }
         }
