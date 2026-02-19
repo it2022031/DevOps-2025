@@ -34,3 +34,4 @@ vm/vagrant/ssh.config
 *.bak.*
 *.swp
 *.tmp
+*.deb
